@@ -1,1 +1,1 @@
-{"version":3,"file":"speed.d.ts","sourceRoot":"","sources":["../../src/scorer/speed.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,sBAAsB,CAAA;AACxD,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,qBAAqB,CAAA;AA+BtD,wBAAgB,aAAa,CAC3B,KAAK,EAAE,WAAW,EAClB,QAAQ,EAAE,YAAY,GACrB,MAAM,CAYR"}
+{"version":3,"file":"speed.d.ts","sourceRoot":"","sources":["../../src/scorer/speed.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,sBAAsB,CAAA;AACxD,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,qBAAqB,CAAA;AAyBtD,wBAAgB,aAAa,CAC3B,KAAK,EAAE,WAAW,EAClB,QAAQ,EAAE,YAAY,GACrB,MAAM,CAYR"}

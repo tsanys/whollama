@@ -3,16 +3,13 @@ import { execa } from 'execa'
 import * as fs from 'fs/promises'
 
 export async function detectDiskFreeGb(): Promise<number> {
-  // Try Node 18+ native statfs first (macOS/Linux)
-  if (typeof fs.statfs === 'function') {
-    try {
-      const stats = await fs.statfs(os.homedir())
-      // bsize * bavail = free bytes
-      const freeBytes = Number(stats.bsize) * Number(stats.bavail)
-      return parseFloat((freeBytes / (1024 * 1024 * 1024)).toFixed(1))
-    } catch {
-      // fall through to df
-    }
+  // Try Node native statfs (available on macOS/Linux)
+  try {
+    const stats = await fs.statfs(os.homedir())
+    const freeBytes = Number(stats.bsize) * Number(stats.bavail)
+    return parseFloat((freeBytes / (1024 * 1024 * 1024)).toFixed(1))
+  } catch {
+    // fall through to df
   }
 
   // Fallback: df -k on macOS/Linux

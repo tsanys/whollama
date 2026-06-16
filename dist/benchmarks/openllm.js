@@ -1,4 +1,5 @@
 import { safeFetch } from '../utils/fetch.js';
+import { normalizeModelName } from '../utils/constants.js';
 /**
  * Fetch scores from Hugging Face Open LLM Leaderboard v2.
  * Try Hugging Face datasets API and raw data endpoints.
@@ -56,14 +57,6 @@ async function tryFetchEndpoint(url) {
     catch {
         return new Map();
     }
-}
-function normalizeModelName(name) {
-    return name
-        .toLowerCase()
-        .replace(/[\/:]/g, ' ')
-        .replace(/[-_]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
 }
 function normalizeScore(score, min, max) {
     const range = max - min;

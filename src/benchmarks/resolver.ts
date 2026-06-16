@@ -1,9 +1,7 @@
-import type { BenchmarkScore, ScoreTier } from './types.js'
+import type { BenchmarkScore } from './types.js'
 
 const QUANT_PATTERN = /(?:Q[2-8]_K_[SML]|Q[2-8]_0|F16|F32)/gi
 const SUFFIX_PATTERN = /\b(instruct|chat|it)\b/gi
-const VERSION_PATTERN = /:?v?\d+(?:\.\d+)?(?:-v?\d+(?:\.\d+)?)?$/i
-const TAG_PATTERN = /:[\w.]+$/
 
 /**
  * Normalize a model name for fuzzy matching.

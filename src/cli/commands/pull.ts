@@ -1,8 +1,6 @@
 import * as readline from 'readline'
 import { execa } from 'execa'
-import type { ScoredModel } from '../../scorer/types.js'
 import { recommendCommand } from './recommend.js'
-import { renderTable, renderJson } from '../display.js'
 
 export interface PullOptions {
   model?: string

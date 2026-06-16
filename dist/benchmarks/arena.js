@@ -1,4 +1,5 @@
 import { safeFetch } from '../utils/fetch.js';
+import { normalizeModelName } from '../utils/constants.js';
 /**
  * Fetch Chatbot Arena ELO scores from LMSYS public data.
  * Try multiple known endpoints.
@@ -60,14 +61,6 @@ async function tryFetchEndpoint(url) {
     catch {
         return new Map();
     }
-}
-function normalizeModelName(name) {
-    return name
-        .toLowerCase()
-        .replace(/[\/:]/g, ' ')
-        .replace(/[-_]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
 }
 function normalizeElo(elo, minElo, maxElo) {
     const range = maxElo - minElo;

@@ -1,4 +1,4 @@
-const EIGHTEEN_MONTHS_MS = 18 * 30 * 24 * 60 * 60 * 1000
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000
 
 export function recencyMultiplier(updatedAt: string): number {
   const updated = new Date(updatedAt).getTime()
@@ -7,7 +7,7 @@ export function recencyMultiplier(updatedAt: string): number {
 
   if (ageMs <= 0) return 1.0
 
-  const ageMonths = ageMs / (30 * 24 * 60 * 60 * 1000)
+  const ageMonths = ageMs / MONTH_MS
   const multiplier = 1.0 - (ageMonths / 18) * 0.2
 
   // Clamp to [0.8, 1.0]

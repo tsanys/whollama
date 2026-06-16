@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander'
+import chalk from 'chalk'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -9,7 +10,7 @@ import { pullCommand } from './cli/commands/pull.js'
 import { listCommand } from './cli/commands/list.js'
 import { infoCommand } from './cli/commands/info.js'
 import { updateCommand } from './cli/commands/update.js'
-import { startSpinner, stopSpinner, failSpinner } from './cli/spinner.js'
+import { failSpinner } from './cli/spinner.js'
 
 interface PackageJson {
   version?: string
@@ -34,6 +35,11 @@ program
   .option('--no-color', 'Disable colored output')
   .option('--verbose', 'Show detailed logging')
   .option('--offline', 'Force offline mode')
+  .hook('preAction', (cmd) => {
+    if (cmd.getOptionValue('noColor')) {
+      chalk.level = 0
+    }
+  })
 
 // Default command: recommend
 program

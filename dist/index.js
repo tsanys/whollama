@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -24,7 +25,12 @@ program
     .version(pkg.version ?? '0.1.0')
     .option('--no-color', 'Disable colored output')
     .option('--verbose', 'Show detailed logging')
-    .option('--offline', 'Force offline mode');
+    .option('--offline', 'Force offline mode')
+    .hook('preAction', (cmd) => {
+    if (cmd.getOptionValue('noColor')) {
+        chalk.level = 0;
+    }
+});
 // Default command: recommend
 program
     .command('recommend', { isDefault: true, hidden: true })

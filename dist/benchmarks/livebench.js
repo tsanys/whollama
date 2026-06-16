@@ -1,4 +1,5 @@
 import { safeFetch } from '../utils/fetch.js';
+import { normalizeModelName } from '../utils/constants.js';
 /**
  * Fetch latest scores from LiveBench public data.
  * Try multiple known endpoints, return empty map if all fail.
@@ -44,14 +45,6 @@ async function tryFetchEndpoint(url) {
     catch {
         return new Map();
     }
-}
-function normalizeModelName(name) {
-    return name
-        .toLowerCase()
-        .replace(/[\/:]/g, ' ')
-        .replace(/[-_]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
 }
 function normalizeScore(score, min, max) {
     if (max === min)

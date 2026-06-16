@@ -104,8 +104,12 @@ export async function scrapeCatalog() {
         return [];
     // For each model, fetch tag variants (rate-limited)
     const models = [];
-    for (const item of allItems) {
+    for (const [index, item] of allItems.entries()) {
         try {
+            // Rate limit: 1 request per second between tag page fetches
+            if (index > 0) {
+                await new Promise((r) => setTimeout(r, 1100));
+            }
             const variants = await scrapeTagVariants(item.name);
             if (variants.length > 0) {
                 for (const v of variants) {

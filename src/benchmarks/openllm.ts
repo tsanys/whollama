@@ -1,4 +1,5 @@
 import { safeFetch } from '../utils/fetch.js'
+import { normalizeModelName } from '../utils/constants.js'
 
 /**
  * Fetch scores from Hugging Face Open LLM Leaderboard v2.
@@ -57,15 +58,6 @@ async function tryFetchEndpoint(url: string): Promise<Map<string, number>> {
   } catch {
     return new Map()
   }
-}
-
-function normalizeModelName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[\/:]/g, ' ')
-    .replace(/[-_]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 function normalizeScore(score: number, min: number, max: number): number {
