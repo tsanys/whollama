@@ -21,7 +21,15 @@ export function scoreModels(models, benchmarks, hardware, options = {}) {
         }
         // Task filter: skip if task specified and model doesn't have the tag
         if (task && task !== 'general') {
-            if (!model.tags.includes(task))
+            const tagMap = {
+                coding: 'code',
+                vision: 'vision',
+                math: 'math',
+                tools: 'tools',
+                embedding: 'embedding',
+            };
+            const mappedTask = tagMap[task] ?? task;
+            if (!model.tags.includes(mappedTask))
                 continue;
         }
         // Resolve benchmark score

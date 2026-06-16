@@ -40,7 +40,15 @@ export function scoreModels(
 
     // Task filter: skip if task specified and model doesn't have the tag
     if (task && task !== 'general') {
-      if (!model.tags.includes(task as never)) continue
+      const tagMap: Record<string, string> = {
+        coding: 'code',
+        vision: 'vision',
+        math: 'math',
+        tools: 'tools',
+        embedding: 'embedding',
+      }
+      const mappedTask = tagMap[task] ?? task
+      if (!model.tags.includes(mappedTask as never)) continue
     }
 
     // Resolve benchmark score
