@@ -1,0 +1,401 @@
+{
+  "llama3.2:1b": {
+    "score": 45.2,
+    "tier": "curated",
+    "sources": { "arena_elo": 42.0, "livebench": 48.4 },
+    "last_updated": "2024-09-25T00:00:00.000Z"
+  },
+  "llama3.2:3b": {
+    "score": 58.7,
+    "tier": "direct",
+    "sources": { "arena_elo": 56.0, "livebench": 61.4 },
+    "last_updated": "2024-09-25T00:00:00.000Z"
+  },
+  "llama3.2:11b-vision": {
+    "score": 62.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 60.0, "livebench": 64.2 },
+    "last_updated": "2024-09-25T00:00:00.000Z"
+  },
+  "llama3.3:70b": {
+    "score": 82.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 80.0, "livebench": 85.0 },
+    "last_updated": "2024-12-06T00:00:00.000Z"
+  },
+  "qwen3:0.6b": {
+    "score": 38.5,
+    "tier": "curated",
+    "sources": { "arena_elo": 36.0, "livebench": 41.0 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:4b": {
+    "score": 62.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 60.0, "livebench": 65.6 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:8b": {
+    "score": 72.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 70.0, "livebench": 74.8 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:14b": {
+    "score": 82.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 80.0, "livebench": 84.2 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:30b": {
+    "score": 85.7,
+    "tier": "direct",
+    "sources": { "arena_elo": 84.0, "livebench": 87.4 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:32b": {
+    "score": 86.0,
+    "tier": "direct",
+    "sources": { "arena_elo": 84.5, "livebench": 87.5 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "qwen3:235b": {
+    "score": 94.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 93.0, "livebench": 95.4 },
+    "last_updated": "2025-04-15T00:00:00.000Z"
+  },
+  "gemma4:4b": {
+    "score": 60.3,
+    "tier": "direct",
+    "sources": { "arena_elo": 58.0, "livebench": 62.6 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma4:12b": {
+    "score": 78.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 76.0, "livebench": 81.0 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma4:27b": {
+    "score": 85.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 84.0, "livebench": 87.8 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma3:1b": {
+    "score": 42.1,
+    "tier": "curated",
+    "sources": { "arena_elo": 40.0, "livebench": 44.2 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma3:4b": {
+    "score": 56.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 54.0, "livebench": 59.6 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma3:12b": {
+    "score": 73.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 71.0, "livebench": 75.4 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "gemma3:27b": {
+    "score": 81.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 79.0, "livebench": 83.8 },
+    "last_updated": "2025-03-12T00:00:00.000Z"
+  },
+  "phi4:14b": {
+    "score": 78.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 77.0, "livebench": 80.8 },
+    "last_updated": "2024-12-15T00:00:00.000Z"
+  },
+  "phi4-mini:3.8b": {
+    "score": 61.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 59.0, "livebench": 63.4 },
+    "last_updated": "2025-01-10T00:00:00.000Z"
+  },
+  "mistral:7b": {
+    "score": 65.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 63.0, "livebench": 67.8 },
+    "last_updated": "2023-09-27T00:00:00.000Z"
+  },
+  "mistral:small": {
+    "score": 76.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 75.0, "livebench": 78.6 },
+    "last_updated": "2024-12-01T00:00:00.000Z"
+  },
+  "mistral:large": {
+    "score": 88.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 87.0, "livebench": 89.8 },
+    "last_updated": "2024-12-01T00:00:00.000Z"
+  },
+  "mistral-nemo:12b": {
+    "score": 71.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 69.0, "livebench": 74.0 },
+    "last_updated": "2024-07-18T00:00:00.000Z"
+  },
+  "deepseek-r1:1.5b": {
+    "score": 48.6,
+    "tier": "curated",
+    "sources": { "arena_elo": 46.0, "livebench": 51.2 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "deepseek-r1:7b": {
+    "score": 66.3,
+    "tier": "direct",
+    "sources": { "arena_elo": 64.0, "livebench": 68.6 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "deepseek-r1:8b": {
+    "score": 67.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 65.0, "livebench": 69.2 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "deepseek-r1:14b": {
+    "score": 75.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 74.0, "livebench": 77.6 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "deepseek-r1:32b": {
+    "score": 83.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 82.0, "livebench": 85.0 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "deepseek-r1:70b": {
+    "score": 89.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 88.0, "livebench": 90.4 },
+    "last_updated": "2025-01-20T00:00:00.000Z"
+  },
+  "llava:7b": {
+    "score": 55.3,
+    "tier": "direct",
+    "sources": { "arena_elo": 53.0, "livebench": 57.6 },
+    "last_updated": "2024-05-10T00:00:00.000Z"
+  },
+  "llava:13b": {
+    "score": 62.7,
+    "tier": "direct",
+    "sources": { "arena_elo": 60.0, "livebench": 65.4 },
+    "last_updated": "2024-05-10T00:00:00.000Z"
+  },
+  "llava:34b": {
+    "score": 70.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 68.0, "livebench": 72.2 },
+    "last_updated": "2024-05-10T00:00:00.000Z"
+  },
+  "nomic-embed-text:v1.5": {
+    "score": 30.0,
+    "tier": "curated",
+    "sources": {}, "last_updated": "2024-02-15T00:00:00.000Z"
+  },
+  "codellama:7b": {
+    "score": 52.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 50.0, "livebench": 55.6 },
+    "last_updated": "2024-01-29T00:00:00.000Z"
+  },
+  "codellama:13b": {
+    "score": 58.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 56.0, "livebench": 60.8 },
+    "last_updated": "2024-01-29T00:00:00.000Z"
+  },
+  "codellama:34b": {
+    "score": 66.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 65.0, "livebench": 68.8 },
+    "last_updated": "2024-01-29T00:00:00.000Z"
+  },
+  "dolphin-mixtral:8x7b": {
+    "score": 64.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 62.0, "livebench": 66.4 },
+    "last_updated": "2024-01-15T00:00:00.000Z"
+  },
+  "dolphin3:8b": {
+    "score": 68.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 66.0, "livebench": 71.0 },
+    "last_updated": "2025-01-10T00:00:00.000Z"
+  },
+  "neural-chat:7b": {
+    "score": 54.6,
+    "tier": "direct",
+    "sources": { "arena_elo": 52.0, "livebench": 57.2 },
+    "last_updated": "2024-01-01T00:00:00.000Z"
+  },
+  "starling-lm:7b": {
+    "score": 56.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 54.0, "livebench": 58.2 },
+    "last_updated": "2024-01-15T00:00:00.000Z"
+  },
+  "orca-mini:7b": {
+    "score": 48.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 47.0, "livebench": 50.8 },
+    "last_updated": "2023-08-01T00:00:00.000Z"
+  },
+  "orca-mini:3b": {
+    "score": 41.3,
+    "tier": "curated",
+    "sources": { "arena_elo": 39.0, "livebench": 43.6 },
+    "last_updated": "2023-08-01T00:00:00.000Z"
+  },
+  "vicuna:7b": {
+    "score": 50.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 48.0, "livebench": 52.4 },
+    "last_updated": "2023-04-01T00:00:00.000Z"
+  },
+  "vicuna:13b": {
+    "score": 57.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 55.0, "livebench": 60.0 },
+    "last_updated": "2023-04-01T00:00:00.000Z"
+  },
+  "llama2:7b": {
+    "score": 46.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 45.0, "livebench": 48.6 },
+    "last_updated": "2023-07-18T00:00:00.000Z"
+  },
+  "llama2:13b": {
+    "score": 53.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 51.0, "livebench": 55.8 },
+    "last_updated": "2023-07-18T00:00:00.000Z"
+  },
+  "llama2:70b": {
+    "score": 68.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 66.0, "livebench": 70.4 },
+    "last_updated": "2023-07-18T00:00:00.000Z"
+  },
+  "mixtral:8x7b": {
+    "score": 72.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 71.0, "livebench": 74.6 },
+    "last_updated": "2024-01-10T00:00:00.000Z"
+  },
+  "mixtral:8x22b": {
+    "score": 80.1,
+    "tier": "direct",
+    "sources": { "arena_elo": 79.0, "livebench": 81.2 },
+    "last_updated": "2024-04-17T00:00:00.000Z"
+  },
+  "command-r:35b": {
+    "score": 70.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 69.0, "livebench": 72.0 },
+    "last_updated": "2024-03-15T00:00:00.000Z"
+  },
+  "command-r-plus:104b": {
+    "score": 81.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 80.0, "livebench": 83.6 },
+    "last_updated": "2024-04-01T00:00:00.000Z"
+  },
+  "codestral:22b": {
+    "score": 74.6,
+    "tier": "direct",
+    "sources": { "arena_elo": 73.0, "livebench": 76.2 },
+    "last_updated": "2024-07-15T00:00:00.000Z"
+  },
+  "starcoder2:7b": {
+    "score": 58.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 57.0, "livebench": 60.8 },
+    "last_updated": "2024-03-15T00:00:00.000Z"
+  },
+  "starcoder2:15b": {
+    "score": 66.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 65.0, "livebench": 67.8 },
+    "last_updated": "2024-03-15T00:00:00.000Z"
+  },
+  "deepseek-coder-v2:16b": {
+    "score": 75.3,
+    "tier": "direct",
+    "sources": { "arena_elo": 74.0, "livebench": 76.6 },
+    "last_updated": "2024-06-17T00:00:00.000Z"
+  },
+  "deepseek-coder-v2:236b": {
+    "score": 88.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 88.0, "livebench": 89.8 },
+    "last_updated": "2024-06-17T00:00:00.000Z"
+  },
+  "llama3.1:8b": {
+    "score": 70.8,
+    "tier": "direct",
+    "sources": { "arena_elo": 69.0, "livebench": 72.6 },
+    "last_updated": "2024-07-23T00:00:00.000Z"
+  },
+  "llama3.1:70b": {
+    "score": 83.2,
+    "tier": "direct",
+    "sources": { "arena_elo": 82.0, "livebench": 84.4 },
+    "last_updated": "2024-07-23T00:00:00.000Z"
+  },
+  "llama3.1:405b": {
+    "score": 91.5,
+    "tier": "direct",
+    "sources": { "arena_elo": 91.0, "livebench": 92.0 },
+    "last_updated": "2024-07-23T00:00:00.000Z"
+  },
+  "qwen2.5:0.5b": {
+    "score": 35.6,
+    "tier": "curated",
+    "sources": { "arena_elo": 33.0, "livebench": 38.2 },
+    "last_updated": "2024-09-19T00:00:00.000Z"
+  },
+  "qwen2.5:7b": {
+    "score": 68.9,
+    "tier": "direct",
+    "sources": { "arena_elo": 67.0, "livebench": 70.8 },
+    "last_updated": "2024-09-19T00:00:00.000Z"
+  },
+  "qwen2.5:14b": {
+    "score": 76.4,
+    "tier": "direct",
+    "sources": { "arena_elo": 75.0, "livebench": 77.8 },
+    "last_updated": "2024-09-19T00:00:00.000Z"
+  },
+  "qwen2.5:32b": {
+    "score": 81.6,
+    "tier": "direct",
+    "sources": { "arena_elo": 80.0, "livebench": 83.2 },
+    "last_updated": "2024-09-19T00:00:00.000Z"
+  },
+  "qwen2.5:72b": {
+    "score": 87.3,
+    "tier": "direct",
+    "sources": { "arena_elo": 86.0, "livebench": 88.6 },
+    "last_updated": "2024-09-19T00:00:00.000Z"
+  },
+  "mxbai-embed-large:v1": {
+    "score": 22.0,
+    "tier": "curated",
+    "sources": {}, "last_updated": "2024-03-15T00:00:00.000Z"
+  },
+  "snowflake-arctic-embed:2b": {
+    "score": 25.0,
+    "tier": "curated",
+    "sources": {}, "last_updated": "2024-05-01T00:00:00.000Z"
+  }
+}

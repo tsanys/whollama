@@ -1,0 +1,48 @@
+{
+  "name": "whollama",
+  "version": "0.1.0",
+  "description": "Find the best Ollama model for your hardware, ranked by real benchmarks",
+  "type": "module",
+  "bin": {
+    "whollama": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "data"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "chmod +x dist/index.js",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ollama",
+    "llm",
+    "cli",
+    "benchmark",
+    "recommendation"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pandunorsyabani/whollama.git"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "execa": "^9.6.1",
+    "node-html-parser": "^7.1.0",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

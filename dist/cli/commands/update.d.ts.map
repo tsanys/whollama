@@ -1,0 +1,1 @@
+{"version":3,"file":"update.d.ts","sourceRoot":"","sources":["../../../src/cli/commands/update.ts"],"names":[],"mappings":"AAIA,MAAM,WAAW,aAAa;IAC5B,OAAO,CAAC,EAAE,OAAO,CAAA;IACjB,OAAO,CAAC,EAAE,OAAO,CAAA;CAClB;AAED,wBAAsB,aAAa,CAAC,OAAO,EAAE,aAAa,GAAG,OAAO,CAAC,IAAI,CAAC,CAgBzE"}
