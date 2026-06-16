@@ -1,10 +1,10 @@
 {
-  "name": "whollama",
+  "name": "@tsany/whollama",
   "version": "0.1.0",
   "description": "Find the best Ollama model for your hardware, ranked by real benchmarks",
   "type": "module",
   "bin": {
-    "whollama": "./dist/index.js"
+    "whollama": "dist/index.js"
   },
   "engines": {
     "node": ">=18"
@@ -30,7 +30,7 @@
   "author": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pandunorsyabani/whollama.git"
+    "url": "git+https://github.com/tsanys/whollama.git"
   },
   "dependencies": {
     "chalk": "^4.1.2",

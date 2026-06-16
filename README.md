@@ -7,7 +7,7 @@ Auto-detect your GPU/CPU/RAM and get ranked recommendations from the Ollama libr
 ## Quick Start
 
 ```bash
-npx whollama
+npx @tsany/whollama
 ```
 
 That's it. whollama detects your hardware, fetches the latest model catalog and benchmark scores, and shows you the top recommendations.
@@ -15,9 +15,9 @@ That's it. whollama detects your hardware, fetches the latest model catalog and 
 ## Install
 
 ```bash
-npm install -g whollama   # global install
+npm install -g @tsany/whollama   # global install
 # or
-npx whollama              # zero-install, always latest
+npx @tsany/whollama              # zero-install, always latest
 ```
 
 ## Usage
