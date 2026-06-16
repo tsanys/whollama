@@ -1,6 +1,6 @@
 {
   "name": "@tsany/whollama",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Find the best Ollama model for your hardware, ranked by real benchmarks",
   "type": "module",
   "bin": {
