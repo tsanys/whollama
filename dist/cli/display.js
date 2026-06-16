@@ -23,7 +23,7 @@ export function renderTable(results, hardware, task) {
     console.log();
     const table = new Table({
         head: ['#', 'Model', 'Params', 'Quant', 'Score', 'Speed', 'Tags'],
-        colWidths: [4, 30, 8, 8, 7, 9, 25],
+        colWidths: [4, 30, 8, 8, 7, 12, 25],
         style: { head: ['cyan'], border: ['gray'] },
     });
     for (const m of results) {
