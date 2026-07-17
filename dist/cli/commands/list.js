@@ -3,7 +3,7 @@ import { getCatalog } from '../../catalog/index.js';
 import { getBenchmarkScores } from '../../benchmarks/index.js';
 import { scoreModels } from '../../scorer/index.js';
 import { renderTable, renderJson } from '../display.js';
-import { startSpinner, stopSpinner } from '../spinner.js';
+import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js';
 import { setVerbose } from '../../utils/logger.js';
 export async function listCommand(options) {
     if (options.verbose)
@@ -19,7 +19,12 @@ export async function listCommand(options) {
     const hardware = await detectHardware(hardwareOverrides);
     stopSpinner('Hardware detected');
     startSpinner('Fetching model catalog...');
-    const catalog = await getCatalog({ offline: options.offline });
+    const catalog = await getCatalog({
+        offline: options.offline,
+        onProgress: (current, total, name) => {
+            updateSpinner(`Fetching model catalog... (${current}/${total}) ${name}`);
+        },
+    });
     stopSpinner(`Found ${catalog.models.length} models`);
     startSpinner('Loading benchmarks...');
     const benchmarks = await getBenchmarkScores({ offline: options.offline });

@@ -1,5 +1,6 @@
 export type ModelTag = 'tools' | 'vision' | 'code' | 'math' | 'embedding' | 'general';
 export type CatalogSource = 'live' | 'cache' | 'curated';
+export type CatalogProgressCallback = (current: number, total: number, modelName: string) => void;
 export interface OllamaModel {
     name: string;
     family: string;

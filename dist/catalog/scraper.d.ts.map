@@ -1,1 +1,1 @@
-{"version":3,"file":"scraper.d.ts","sourceRoot":"","sources":["../../src/catalog/scraper.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,WAAW,EAAY,MAAM,YAAY,CAAA;AAoHvD,wBAAsB,aAAa,IAAI,OAAO,CAAC,WAAW,EAAE,CAAC,CAsE5D"}
+{"version":3,"file":"scraper.d.ts","sourceRoot":"","sources":["../../src/catalog/scraper.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,WAAW,EAAY,uBAAuB,EAAE,MAAM,YAAY,CAAA;AA0KhF,wBAAsB,aAAa,CACjC,UAAU,CAAC,EAAE,uBAAuB,GACnC,OAAO,CAAC,WAAW,EAAE,CAAC,CAiCxB"}

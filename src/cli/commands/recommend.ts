@@ -4,7 +4,7 @@ import { getCatalog } from '../../catalog/index.js'
 import { getBenchmarkScores } from '../../benchmarks/index.js'
 import { scoreModels } from '../../scorer/index.js'
 import { renderTable, renderJson } from '../display.js'
-import { startSpinner, updateSpinner, stopSpinner, failSpinner } from '../spinner.js'
+import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js'
 import { verboseLog, setVerbose } from '../../utils/logger.js'
 import type { ScoredModel } from '../../scorer/types.js'
 
@@ -39,7 +39,12 @@ export async function recommendCommand(
 
   // Step 2: Fetch catalog
   startSpinner('Fetching model catalog...')
-  const catalog = await getCatalog({ offline: options.offline })
+  const catalog = await getCatalog({
+    offline: options.offline,
+    onProgress: (current, total, name) => {
+      updateSpinner(`Fetching model catalog... (${current}/${total}) ${name}`)
+    },
+  })
   verboseLog(`Catalog: ${catalog.models.length} models (source: ${catalog.source})`)
   stopSpinner(`Found ${catalog.models.length} models (${catalog.source})`)
 

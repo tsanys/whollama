@@ -1,14 +1,19 @@
 import { getCatalog } from '../../catalog/index.js';
 import { getBenchmarkScores } from '../../benchmarks/index.js';
 import { resolveScore, normalize } from '../../benchmarks/resolver.js';
-import { startSpinner, stopSpinner } from '../spinner.js';
+import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js';
 import { renderModelInfo } from '../display.js';
 import { setVerbose } from '../../utils/logger.js';
 export async function infoCommand(options) {
     if (options.verbose)
         setVerbose(true);
     startSpinner('Fetching model catalog...');
-    const catalog = await getCatalog({ offline: options.offline });
+    const catalog = await getCatalog({
+        offline: options.offline,
+        onProgress: (current, total, name) => {
+            updateSpinner(`Fetching model catalog... (${current}/${total}) ${name}`);
+        },
+    });
     stopSpinner('Catalog loaded');
     // Find model by name (fuzzy matching)
     const searchName = options.modelName.toLowerCase();

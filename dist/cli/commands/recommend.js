@@ -3,7 +3,7 @@ import { getCatalog } from '../../catalog/index.js';
 import { getBenchmarkScores } from '../../benchmarks/index.js';
 import { scoreModels } from '../../scorer/index.js';
 import { renderTable, renderJson } from '../display.js';
-import { startSpinner, stopSpinner } from '../spinner.js';
+import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js';
 import { verboseLog, setVerbose } from '../../utils/logger.js';
 export async function recommendCommand(options) {
     if (options.verbose) {
@@ -23,7 +23,12 @@ export async function recommendCommand(options) {
     stopSpinner('Hardware detected');
     // Step 2: Fetch catalog
     startSpinner('Fetching model catalog...');
-    const catalog = await getCatalog({ offline: options.offline });
+    const catalog = await getCatalog({
+        offline: options.offline,
+        onProgress: (current, total, name) => {
+            updateSpinner(`Fetching model catalog... (${current}/${total}) ${name}`);
+        },
+    });
     verboseLog(`Catalog: ${catalog.models.length} models (source: ${catalog.source})`);
     stopSpinner(`Found ${catalog.models.length} models (${catalog.source})`);
     // Step 3: Fetch benchmark scores

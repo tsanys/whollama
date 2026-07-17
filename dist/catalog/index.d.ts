@@ -1,7 +1,8 @@
-import type { OllamaModel } from './types.js';
+import type { OllamaModel, CatalogProgressCallback } from './types.js';
 export interface CatalogOptions {
     offline?: boolean;
     forceRefresh?: boolean;
+    onProgress?: CatalogProgressCallback;
 }
 export interface CatalogResult {
     models: OllamaModel[];

@@ -22,6 +22,7 @@ export async function safeFetch(
         signal: controller.signal,
         headers: {
           'User-Agent': 'whollama/0.1.0',
+          'Accept': 'text/html,application/xhtml+xml',
         },
       })
       clearTimeout(timer)
@@ -30,7 +31,6 @@ export async function safeFetch(
       if (attempt === retries) {
         return null
       }
-      // Wait before retry (exponential backoff)
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
     }
   }
