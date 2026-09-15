@@ -8,6 +8,12 @@ import { detectDiskFreeGb } from './disk.js'
 // Combined lookup for manual GPU override matching
 const GPU_OVERRIDE_LOOKUP: Record<string, { bandwidth: number; vendor: 'apple' | 'nvidia' | 'amd' }> = {
   // NVIDIA
+  'RTX 5090': { bandwidth: 1792, vendor: 'nvidia' },
+  'RTX 5080': { bandwidth: 960, vendor: 'nvidia' },
+  'RTX 5070 Ti': { bandwidth: 896, vendor: 'nvidia' },
+  'RTX 5070': { bandwidth: 672, vendor: 'nvidia' },
+  'RTX 5060 Ti': { bandwidth: 448, vendor: 'nvidia' },
+  'RTX 5060': { bandwidth: 448, vendor: 'nvidia' },
   'RTX 4090': { bandwidth: 1008, vendor: 'nvidia' },
   'RTX 4080': { bandwidth: 717, vendor: 'nvidia' },
   'RTX 4070': { bandwidth: 504, vendor: 'nvidia' },
@@ -30,7 +36,11 @@ const GPU_OVERRIDE_LOOKUP: Record<string, { bandwidth: number; vendor: 'apple' |
   'M4 Max': { bandwidth: 546, vendor: 'apple' },
   'M4 Pro': { bandwidth: 273, vendor: 'apple' },
   M4: { bandwidth: 120, vendor: 'apple' },
+  M5: { bandwidth: 153, vendor: 'apple' },
   // AMD
+  'RX 9070 XT': { bandwidth: 640, vendor: 'amd' },
+  'RX 9070': { bandwidth: 640, vendor: 'amd' },
+  'MI300X': { bandwidth: 5300, vendor: 'amd' },
   'RX 7900 XTX': { bandwidth: 960, vendor: 'amd' },
   'RX 7900 XT': { bandwidth: 800, vendor: 'amd' },
   'RX 7800 XT': { bandwidth: 624, vendor: 'amd' },

@@ -10,6 +10,10 @@ interface RocmSmiOutput {
 }
 
 const BANDWIDTH_LOOKUP: Record<string, number> = {
+  'RX 9070 XT': 640,
+  'RX 9070': 640,
+  'RX 9060 XT': 322,
+  'RX 9060': 288,
   'RX 7900 XTX': 960,
   'RX 7900 XT': 800,
   'RX 7800 XT': 624,
@@ -22,6 +26,9 @@ const BANDWIDTH_LOOKUP: Record<string, number> = {
   'RX 6600 XT': 256,
   'MI250X': 1638,
   'MI250': 1638,
+  'MI300X': 5300,
+  'MI325X': 6000,
+  'MI350X': 8000,
   'MI210': 1638,
   'MI100': 1228,
   'MI50': 1024,
@@ -37,6 +44,8 @@ function getBandwidth(gpuName: string): number {
   }
   return 400 // conservative fallback for modern AMD
 }
+
+export { getBandwidth as getAmdBandwidth }
 
 export async function detectAmdGpu(): Promise<HardwareGpu | null> {
   try {

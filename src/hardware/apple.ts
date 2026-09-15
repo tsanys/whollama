@@ -23,6 +23,7 @@ const BANDWIDTH_LOOKUP: Record<string, number> = {
   'M4 Max': 546,
   'M4 Pro': 273,
   M4: 120,
+  M5: 153,
 }
 
 function getBandwidth(chipName: string): number {
@@ -34,6 +35,8 @@ function getBandwidth(chipName: string): number {
   }
   return 100
 }
+
+export { getBandwidth as getAppleBandwidth }
 
 function parseMemoryGb(memoryStr: string): number {
   const match = memoryStr.match(/(\d+(?:\.\d+)?)\s*GB/)
