@@ -1,13 +1,22 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
 import {
   parsePulls,
   parseTags,
   sanitizeScraped,
+  extractPulls,
   modelFromVariants,
   parseCatalogListHtml,
-  QUANT_TAG_PATTERN,
-  SIZE_PATTERN,
+  parseTagVariant,
+  parseTagsPageHtml,
+  parseTagsJson,
+  dedupeModels,
+  dedupeItems,
 } from '../src/catalog/scraper.js'
+
+function fixture(name: string): string {
+  return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')
+}
 
 describe('parsePulls', () => {
   it('parses M suffix to millions', () => {
@@ -50,15 +59,89 @@ describe('sanitizeScraped', () => {
   })
 })
 
-describe('quant/size patterns', () => {
-  it('matches broad quant family', () => {
-    for (const q of ['Q4_K_M', 'Q4_0', 'Q5_0', 'Q3_K_S', 'Q5_K_S', 'Q6_K', 'Q8_0', 'F16', 'F32']) {
-      expect(`14b-instruct-${q.toLowerCase()}`.match(QUANT_TAG_PATTERN)).toBeTruthy()
-    }
+describe('parseTagVariant', () => {
+  it('parses plain size tags (default quant Q4_K_M)', () => {
+    expect(parseTagVariant('qwen3', '14b')).toEqual({ name: 'qwen3:14b', params_b: 14, quant: 'Q4_K_M' })
+    expect(parseTagVariant('qwen3', '0.6b')).toMatchObject({ params_b: 0.6, quant: 'Q4_K_M' })
   })
-  it('extracts size in B', () => {
-    expect('14b-instruct-q4_K_M'.match(SIZE_PATTERN)?.[1]).toBe('14')
-    expect('0.6b-q4_K_M'.match(SIZE_PATTERN)?.[1]).toBe('0.6')
+  it('parses lowercase quant suffixes', () => {
+    expect(parseTagVariant('qwen3', '0.6b-q4_K_M')).toMatchObject({ params_b: 0.6, quant: 'Q4_K_M' })
+    expect(parseTagVariant('qwen3', '0.6b-fp16')).toMatchObject({ params_b: 0.6, quant: 'FP16' })
+    expect(parseTagVariant('qwen3', '8b-q8_0')).toMatchObject({ params_b: 8, quant: 'Q8_0' })
+  })
+  it('parses MoE tags by total params', () => {
+    expect(parseTagVariant('qwen3', '235b-a22b-q4_K_M')).toMatchObject({ params_b: 235, quant: 'Q4_K_M' })
+  })
+  it('parses million-param tags (270m → 0.27B)', () => {
+    expect(parseTagVariant('gemma3', '270m')).toMatchObject({ params_b: 0.27 })
+    expect(parseTagVariant('gemma3', '270m-it-q8_0')).toMatchObject({ params_b: 0.27, quant: 'Q8_0' })
+  })
+  it('falls back to Q4_K_M for unknown quants', () => {
+    expect(parseTagVariant('gemma3', '270m-it-qat')).toMatchObject({ params_b: 0.27, quant: 'Q4_K_M' })
+  })
+  it('returns null for aliases without size', () => {
+    expect(parseTagVariant('qwen3', 'latest')).toBeNull()
+    expect(parseTagVariant('qwen3', 'instruct')).toBeNull()
+    expect(parseTagVariant('qwen3', '')).toBeNull()
+  })
+})
+
+describe('parseTagsPageHtml (real-markup fixtures)', () => {
+  it('qwen3: 4 sized variants, latest skipped, decoys ignored, dupes deduped', () => {
+    const variants = parseTagsPageHtml('qwen3', fixture('ollama-tags-qwen3.html'))
+    const names = variants.map((v) => v.name)
+    expect(names).toEqual([
+      'qwen3:14b',
+      'qwen3:0.6b-q4_K_M',
+      'qwen3:0.6b-fp16',
+      'qwen3:235b-a22b-q4_K_M',
+    ])
+    expect(variants[0]).toMatchObject({ params_b: 14, quant: 'Q4_K_M' })
+    expect(variants[2]).toMatchObject({ params_b: 0.6, quant: 'FP16' })
+  })
+  it('gemma3: 270m family parsed, latest skipped', () => {
+    const variants = parseTagsPageHtml('gemma3', fixture('ollama-tags-gemma3.html'))
+    expect(variants).toHaveLength(4)
+    expect(variants[0]).toMatchObject({ name: 'gemma3:270m', params_b: 0.27, quant: 'Q4_K_M' })
+    expect(variants[3]).toMatchObject({ name: 'gemma3:270m-it-bf16', quant: 'BF16' })
+  })
+  it('model names match case-insensitively', () => {
+    const variants = parseTagsPageHtml('Qwen3', fixture('ollama-tags-qwen3.html'))
+    expect(variants).toHaveLength(4)
+  })
+})
+
+describe('parseTagsJson (content-negotiated body)', () => {
+  it('parses {"tags": [...]} like the live site serves', () => {
+    const body = JSON.stringify({ tags: ['14b', '0.6b-q4_K_M', 'latest', '14b', 42, null] })
+    const variants = parseTagsJson('qwen3', body)
+    expect(variants).toEqual([
+      { name: 'qwen3:14b', params_b: 14, quant: 'Q4_K_M' },
+      { name: 'qwen3:0.6b-q4_K_M', params_b: 0.6, quant: 'Q4_K_M' },
+    ])
+  })
+  it('returns null for non-JSON (caller falls back to HTML)', () => {
+    expect(parseTagsJson('qwen3', '<html>nope</html>')).toBeNull()
+    expect(parseTagsJson('qwen3', JSON.stringify({ models: [] }))).toBeNull()
+  })
+})
+describe('extractPulls', () => {
+  it('matches label split across sibling spans (site markup)', () => {
+    expect(extractPulls(['119.5M', ' Pulls'])).toBe(119_500_000)
+    expect(extractPulls(['1,234', 'pulls'])).toBe(1234)
+  })
+})
+
+describe('dedupe', () => {
+  it('dedupeModels keeps first, case-insensitive', () => {
+    const a = { name: 'Qwen3:14b' }
+    const b = { name: 'qwen3:14b' }
+    const c = { name: 'llama3.2:3b' }
+    expect(dedupeModels([a, b, c] as never[]).map((m) => m.name)).toEqual(['Qwen3:14b', 'llama3.2:3b'])
+  })
+  it('dedupeItems keeps first family', () => {
+    const items = [{ name: 'qwen3' }, { name: 'QWEN3' }, { name: 'llama3.1' }]
+    expect(dedupeItems(items as never[]).map((i) => i.name)).toEqual(['qwen3', 'llama3.1'])
   })
 })
 
@@ -84,6 +167,10 @@ describe('modelFromVariants', () => {
       { name: 'qwen3:14b-instruct-q4_K_M', params_b: 14, quant: 'Q4_K_M' },
     ])
     expect(m.name).toBe('qwen3:14b-instruct-q4_K_M')
+  })
+  it('returns [] when no sized variants (no fake 7B entry)', () => {
+    const item = { name: 'qwen3', description: '', pulls: 0, tags: ['general'] as never[] }
+    expect(modelFromVariants(item as never, [])).toEqual([])
   })
 })
 

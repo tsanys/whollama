@@ -49,11 +49,20 @@ export function parseTags(labelEls: string[]): ModelTag[] {
 }
 
 /** Prefer spans that explicitly mention pulls; avoid matching description numbers like "7B". */
-function extractPulls(texts: string[]): number {
+export function extractPulls(texts: string[]): number {
   // Pass 1: explicit pulls label, e.g. "1.2M Pulls", "850K pulls", "1,234 pulls"
   for (const t of texts) {
     if (/pulls?/i.test(t)) {
       const v = parsePulls(t)
+      if (v > 0) return v
+    }
+  }
+  // Pass 1b: label split across sibling spans (site markup puts the number
+  // and the word "Pulls" in adjacent spans), e.g. ["119.5M", "Pulls"]
+  for (let i = 0; i + 1 < texts.length; i++) {
+    const joined = `${texts[i]} ${texts[i + 1]}`
+    if (/pulls?/i.test(joined)) {
+      const v = parsePulls(joined)
       if (v > 0) return v
     }
   }
@@ -75,6 +84,30 @@ async function scrapeListPage(
 
   const html = await response.text()
   return parseCatalogListHtml(html)
+}
+
+import { MIN_CACHED_MODELS } from './cache.js'
+
+/** Dedupe models by normalized name, keep-first (site pagination overlaps). */
+export function dedupeModels(models: OllamaModel[]): OllamaModel[] {
+  const seen = new Set<string>()
+  return models.filter((m) => {
+    const key = m.name.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** Dedupe scraped list items by family name, keep-first. */
+export function dedupeItems(items: ScrapedModelInfo[]): ScrapedModelInfo[] {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = item.name.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /** Pure HTML → items parser (exported for unit tests with fixtures). */
@@ -111,80 +144,123 @@ export function parseCatalogListHtml(html: string): ScrapedModelInfo[] {
   return items
 }
 
-export const QUANT_TAG_PATTERN = /(Q[2-8](?:_K_[SML]|_[01])?|F16|F32)/i
-export const SIZE_PATTERN = /(\d+(?:\.\d+)?)\s*[bB]\b/
+/** Size prefix of a tag: `14b`, `0.6b`, `270m` (millions → ÷1000). */
+export const TAG_SIZE_PATTERN = /^(\d+(?:\.\d+)?)\s*([bBmM])\b/
+/** Quant suffix of a tag (site uses lowercase): `q4_K_M`, `q8_0`, `fp16`, `bf16`. */
+export const TAG_QUANT_PATTERN = /(q\d+_K_[SML]|q\d+_\d+|fp16|bf16)$/i
 
-export async function scrapeTagVariants(
-  modelName: string,
-): Promise<
-  Array<{ name: string; params_b: number; quant: string }>
-> {
-  const url = `https://ollama.com/library/${modelName}/tags`
-  const response = await safeFetch(url)
-  if (!response || !response.ok) return []
+export interface TagVariant {
+  name: string
+  params_b: number
+  quant: string
+}
 
-  const html = await response.text()
+/**
+ * Parse one tag name (e.g. `14b`, `0.6b-q4_K_M`, `235b-a22b-q4_K_M`,
+ * `270m-it-q8_0`) into a sized variant. Returns null for aliases without
+ * a size prefix (`latest`, `instruct`, ...). Unknown quants fall back to
+ * Ollama's default Q4_K_M.
+ */
+export function parseTagVariant(modelName: string, tag: string): TagVariant | null {
+  const sizeMatch = tag.match(TAG_SIZE_PATTERN)
+  if (!sizeMatch) return null
+  let params_b = parseFloat(sizeMatch[1])
+  if (sizeMatch[2].toLowerCase() === 'm') params_b = params_b / 1000
+  if (!Number.isFinite(params_b) || params_b <= 0) return null
+
+  const quantMatch = tag.match(TAG_QUANT_PATTERN)
+  const quant = quantMatch ? quantMatch[1].toUpperCase() : 'Q4_K_M'
+  return { name: `${modelName}:${tag}`, params_b, quant }
+}
+
+/**
+ * Pure tags-page → variants parser (exported for unit tests with fixtures).
+ * Reads `<a href="/library/<model>:<tag>">` links — the site's current
+ * markup (no tables since the 2026 redesign).
+ */
+export function parseTagsPageHtml(modelName: string, html: string): TagVariant[] {
   const root = parseHTML(html)
-  const variants: Array<{ name: string; params_b: number; quant: string }> = []
+  const want = modelName.toLowerCase()
+  const seen = new Set<string>()
+  const variants: TagVariant[] = []
 
-  const rows = root.querySelectorAll('tr')
-  for (const row of rows) {
-    const cells = row.querySelectorAll('td')
-    if (cells.length < 3) continue
-
-    const tagName = sanitizeScraped(cells[0]?.textContent?.trim() ?? '')
-    if (!tagName || tagName === 'Tags') continue
-
-    const quantMatch = tagName.match(QUANT_TAG_PATTERN)
-    const sizeMatch = tagName.match(SIZE_PATTERN)
-
-    if (quantMatch && sizeMatch) {
-      variants.push({
-        name: `${modelName}:${tagName}`,
-        params_b: parseFloat(sizeMatch[1]),
-        quant: quantMatch[1].toUpperCase(),
-      })
-    }
+  for (const a of root.querySelectorAll('a')) {
+    const href = (a.getAttribute('href') ?? '').split('?')[0]
+    const m = href.match(/^\/library\/([^/:]+):([^/]+)$/)
+    if (!m) continue
+    if (m[1].toLowerCase() !== want) continue
+    const tag = sanitizeScraped(m[2])
+    if (!tag || seen.has(tag.toLowerCase())) continue
+    seen.add(tag.toLowerCase())
+    const v = parseTagVariant(modelName, tag)
+    if (v) variants.push(v)
   }
 
   return variants
 }
 
+export async function scrapeTagVariants(modelName: string): Promise<TagVariant[]> {
+  const url = `https://ollama.com/library/${modelName}/tags`
+  // Ask for JSON: the site serves `{"tags": [...]}` via content negotiation,
+  // which is smaller and immune to markup churn. HTML is the fallback.
+  const response = await safeFetch(url, { accept: 'application/json' })
+  if (!response || !response.ok) return []
+
+  const text = await response.text()
+  const fromJson = parseTagsJson(modelName, text)
+  if (fromJson) return fromJson
+  return parseTagsPageHtml(modelName, text)
+}
+
+/** Parse a `{"tags": [...]}` body. Null = not JSON (caller tries HTML). */
+export function parseTagsJson(modelName: string, text: string): TagVariant[] | null {
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof data !== 'object' || data === null) return null
+  const tags = (data as { tags?: unknown }).tags
+  if (!Array.isArray(tags)) return null
+
+  const seen = new Set<string>()
+  const variants: TagVariant[] = []
+  for (const raw of tags) {
+    if (typeof raw !== 'string') continue
+    const tag = sanitizeScraped(raw)
+    if (!tag || seen.has(tag.toLowerCase())) continue
+    seen.add(tag.toLowerCase())
+    const v = parseTagVariant(modelName, tag)
+    if (v) variants.push(v)
+  }
+  return variants
+}
+
 export function modelFromVariants(
   item: ScrapedModelInfo,
-  variants: Array<{ name: string; params_b: number; quant: string }>,
+  variants: TagVariant[],
 ): OllamaModel[] {
-  if (variants.length > 0) {
-    return variants.map((v) => {
-      const vramGb = estimateVramGb(v.params_b, v.quant)
-      const ramGb = vramGb * 1.2
-      return {
-        name: sanitizeScraped(`${item.name}:${v.name.split(':').pop() ?? 'latest'}`),
-        family: sanitizeScraped(item.name),
-        params_b: v.params_b,
-        quant: v.quant,
-        vram_required_gb: parseFloat(vramGb.toFixed(1)),
-        ram_required_gb: parseFloat(ramGb.toFixed(1)),
-        tags: item.tags,
-        pulls: item.pulls || 0,
-        updated_at: new Date().toISOString(),
-        source: 'live' as const,
-      }
-    })
-  }
-
-  return [{
-    name: `${item.name}:latest`,
-    family: item.name,
-    params_b: 7.0,
-    quant: 'Q4_K_M',
-    vram_required_gb: 4.0,
-    ram_required_gb: 5.0,
-    tags: item.tags,
-    pulls: item.pulls || 0,
-    updated_at: new Date().toISOString(),
-    source: 'live' as const,
-  }]
+  // No sized variants → skip the model entirely. Emitting a fake 7B `:latest`
+  // entry poisons ranking (every model looks identical); the caller falls
+  // through to stale cache → curated catalog instead.
+  if (variants.length === 0) return []
+  return variants.map((v) => {
+    const vramGb = estimateVramGb(v.params_b, v.quant)
+    const ramGb = vramGb * 1.2
+    return {
+      name: sanitizeScraped(`${item.name}:${v.name.split(':').pop() ?? 'latest'}`),
+      family: sanitizeScraped(item.name),
+      params_b: v.params_b,
+      quant: v.quant,
+      vram_required_gb: parseFloat(vramGb.toFixed(1)),
+      ram_required_gb: parseFloat(ramGb.toFixed(1)),
+      tags: item.tags,
+      pulls: item.pulls || 0,
+      updated_at: new Date().toISOString(),
+      source: 'live' as const,
+    }
+  })
 }
 
 async function concurrentMap<T, R>(
@@ -236,13 +312,11 @@ export async function scrapeCatalog(
 async function scrapeCatalogInner(
   onProgress?: CatalogProgressCallback,
 ): Promise<OllamaModel[]> {
+  // Single list page: the site ignores `&page=N` (page 2 returns the same
+  // 240 models), so extra pages only produce duplicates.
   const baseUrl = 'https://ollama.com/library?sort=popular'
 
-  const pages = [baseUrl, `${baseUrl}&page=2`]
-  const pageResults = await Promise.all(
-    pages.map((url) => scrapeListPage(url)),
-  )
-  const allItems = pageResults.flat()
+  const allItems = dedupeItems(await scrapeListPage(baseUrl))
 
   if (allItems.length === 0) return []
 
@@ -267,5 +341,10 @@ async function scrapeCatalogInner(
     models.push(...batch)
   }
 
-  return models
+  const deduped = dedupeModels(models)
+  // A tiny result means the markup changed again — report failure so the
+  // caller falls through to stale cache → curated catalog instead of
+  // caching a broken sliver.
+  if (deduped.length < MIN_CACHED_MODELS) return []
+  return deduped
 }

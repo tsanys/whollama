@@ -12,6 +12,7 @@ export const QUANT_BITS: Record<string, number> = {
   'Q6_K': 6.56,
   'Q8_0': 8.5,
   'F16': 16.0,
+  'BF16': 16.0,
   'F32': 32.0,
 }
 
