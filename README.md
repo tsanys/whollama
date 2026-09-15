@@ -18,6 +18,9 @@ That's it. whollama detects your hardware, fetches the latest model catalog and 
 npm install -g @tsany/whollama   # global install
 # or
 npx @tsany/whollama              # zero-install, always latest
+# or (macOS)
+brew tap tsanys/whollama
+brew install whollama
 ```
 
 ## Usage
@@ -34,13 +37,16 @@ whollama --no-color       # Disable colored output
 whollama --gpu "RTX 4090" --ram 32   # Simulate hardware (planning)
 whollama --gpu "M2 Max" --vram 32
 
-whollama pull             # Interactive model pull
+whollama pull             # Interactive model pull (fuzzy filter)
 whollama pull qwen3:14b   # Pull a specific model
 
 whollama list             # List all fitting models
 whollama list --all       # List all models (including non-fitting)
 
 whollama info qwen3:14b   # Detailed model info
+
+whollama bench            # Benchmark smallest pulled model, calibrate speeds
+whollama bench qwen3:14b  # Benchmark a specific pulled model
 
 whollama update           # Force refresh catalog and benchmarks
 ```
@@ -100,6 +106,10 @@ No network? No problem — whollama ships a bundled catalog and benchmark scores
 | `~/.whollama/benchmarks.json` | 7 days | Merged benchmark scores |
 
 `whollama --offline` skips all network requests and uses the cache (or the bundle on first run). Tiny or corrupt caches are ignored automatically and fall back to the next source.
+
+## Speed calibration
+
+Estimates are based on memory bandwidth heuristics. `whollama bench` measures your real tokens/sec on a pulled model (via the local Ollama daemon) and saves a calibration ratio to `~/.whollama/config.json` — future recommendations scale their speed estimates by it. Re-run after hardware or driver changes.
 
 ## Requirements & troubleshooting
 

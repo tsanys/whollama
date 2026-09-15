@@ -10,6 +10,8 @@ export interface ScoreOptions {
   topN?: number
   task?: string
   showAll?: boolean
+  /** Local bench calibration multiplier for speed estimates (default 1). */
+  speedCalibrationRatio?: number
 }
 
 export function scoreModels(
@@ -18,7 +20,7 @@ export function scoreModels(
   hardware: HardwareInfo,
   options: ScoreOptions = {},
 ): ScoredModel[] {
-  const { topN = 10, task, showAll = false } = options
+  const { topN = 10, task, showAll = false, speedCalibrationRatio = 1 } = options
 
   // Build flat score maps for resolver lookup (model → score)
   // Normalize keys so both catalog names and benchmark keys match.
@@ -61,8 +63,8 @@ export function scoreModels(
     // Resolve benchmark score (live first, curated fallback preserves tier)
     const benchmark = resolveScore(model.name, allScores, curatedScores)
 
-    // Score the model
-    const scoredModel = scoreModel(model, benchmark, hardware)
+    // Score the model (with local bench calibration when available)
+    const scoredModel = scoreModel(model, benchmark, hardware, speedCalibrationRatio)
     scored.push(scoredModel)
   }
 

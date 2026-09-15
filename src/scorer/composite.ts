@@ -25,10 +25,13 @@ export function scoreModel(
   model: OllamaModel,
   benchmark: BenchmarkScore | null,
   hardware: HardwareInfo,
+  speedRatio = 1,
 ): ScoredModel {
   const vramFit = getVramFit(model, hardware)
   const recency = recencyMultiplier(model.updated_at)
-  const speedEstimate = estimateSpeed(model, hardware)
+  // Local bench calibration (from `whollama bench`) scales the estimate
+  const calibratedRatio = Number.isFinite(speedRatio) && speedRatio > 0 ? speedRatio : 1
+  const speedEstimate = Math.round(estimateSpeed(model, hardware) * calibratedRatio)
   // Normalize speed relative to a reference (100 t/s max)
   const speedNorm = Math.min(speedEstimate / 100, 1.0)
 

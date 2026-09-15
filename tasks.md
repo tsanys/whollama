@@ -264,7 +264,7 @@ Status legend: `[ ]` todo · `[x]` done · `[-]` skipped/deferred
 ## Deferred / Future
 
 - [ ] Windows native support (currently documented as WSL)
-- [ ] `whollama bench` — run a quick local benchmark to calibrate speed estimates
+- [x] `whollama bench` — run a quick local benchmark to calibrate speed estimates
 - [ ] Model tag auto-detection from model card (instead of hardcode)
-- [ ] fzf-style interactive selector for `whollama pull`
-- [ ] Homebrew formula
+- [x] fzf-style interactive selector for `whollama pull` (zero-dep inline fuzzy filter, `src/cli/selector.ts`)
+- [x] Homebrew formula (`Formula/whollama.rb` — fill `sha256` from `npm view` on each release)

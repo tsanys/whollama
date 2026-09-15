@@ -1,6 +1,7 @@
-import * as readline from 'readline'
 import { execa } from 'execa'
 import { recommendCommand } from './recommend.js'
+import { selectInteractive } from '../selector.js'
+import type { ScoredModel } from '../../scorer/types.js'
 
 export interface PullOptions {
   model?: string
@@ -48,33 +49,19 @@ export async function pullCommand(options: PullOptions): Promise<void> {
     process.exit(1)
   }
 
-  // Show numbered list for interactive selection
-  console.log('\nSelect a model to pull:\n')
-  for (let i = 0; i < Math.min(results.length, 20); i++) {
-    const m = results[i]
-    console.log(
-      `  ${String(i + 1).padStart(2)}. ${m.name.padEnd(20)} ${'score:'.padEnd(6)} ${m.composite_score.toFixed(1)}  ${m.pull_command}`,
-    )
-  }
-  console.log()
+  const selected = await selectInteractive(
+    results.slice(0, 20).map((m: ScoredModel) => ({
+      value: m,
+      label: `${m.name.padEnd(24)} score: ${m.composite_score.toFixed(1)}  ${m.pull_command}`,
+    })),
+    'Select a model to pull',
+  )
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  })
-
-  const answer = await new Promise<string>((resolve) => {
-    rl.question('  Enter number (or "q" to quit): ', resolve)
-  })
-  rl.close()
-
-  const num = parseInt(answer, 10)
-  if (isNaN(num) || num < 1 || num > results.length) {
+  if (!selected) {
     console.log('Cancelled.')
     return
   }
 
-  const selected = results[num - 1]
   console.log(`\nPulling ${selected.name}...`)
   try {
     await execa('ollama', ['pull', selected.name], { stdio: 'inherit' })

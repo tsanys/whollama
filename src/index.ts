@@ -9,6 +9,7 @@ import { recommendCommand } from './cli/commands/recommend.js'
 import { pullCommand } from './cli/commands/pull.js'
 import { listCommand } from './cli/commands/list.js'
 import { infoCommand } from './cli/commands/info.js'
+import { benchCommand } from './cli/commands/bench.js'
 import { updateCommand } from './cli/commands/update.js'
 import { failSpinner } from './cli/spinner.js'
 
@@ -183,6 +184,33 @@ program
       if (!model || !model.trim()) throw new Error('Model name is required')
       await infoCommand({
         modelName: model.trim(),
+        offline: program.getOptionValue('offline'),
+        verbose: program.getOptionValue('verbose'),
+        gpu: opts.gpu,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
+      })
+    } catch (err) {
+      failSpinner('An error occurred')
+      console.error(err)
+      process.exit(1)
+    }
+  })
+
+// bench command
+program
+  .command('bench')
+  .description('Benchmark a local model to calibrate speed estimates')
+  .argument('[model]', 'Model to benchmark (default: smallest pulled model)')
+  .option('--json', 'Output as JSON')
+  .option('--gpu <spec>', 'Override GPU')
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
+  .action(async (model: string | undefined, opts) => {
+    try {
+      await benchCommand({
+        model,
+        json: opts.json,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
         gpu: opts.gpu,

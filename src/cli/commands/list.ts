@@ -6,6 +6,7 @@ import { scoreModels } from '../../scorer/index.js'
 import { renderTable, renderJson } from '../display.js'
 import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js'
 import { setVerbose } from '../../utils/logger.js'
+import { readCalibration } from '../../bench/runner.js'
 
 export interface ListOptions {
   task?: string
@@ -43,10 +44,13 @@ export async function listCommand(options: ListOptions): Promise<void> {
   const benchmarks = await getBenchmarkScores({ offline: options.offline })
   stopSpinner('Benchmarks loaded')
 
+  const calibration = await readCalibration()
+
   const results = scoreModels(catalog.models, benchmarks.scores, hardware, {
     topN: 999,
     task: options.task,
     showAll: options.all,
+    speedCalibrationRatio: calibration?.ratio,
   })
 
   if (options.json) {

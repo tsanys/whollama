@@ -6,6 +6,7 @@ import { scoreModels } from '../../scorer/index.js'
 import { renderTable, renderJson } from '../display.js'
 import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js'
 import { verboseLog, setVerbose } from '../../utils/logger.js'
+import { readCalibration } from '../../bench/runner.js'
 import type { ScoredModel } from '../../scorer/types.js'
 
 export interface RecommendOptions {
@@ -55,13 +56,17 @@ export async function recommendCommand(
   verboseLog(`Benchmarks: ${benchmarkCount} entries (source: ${benchmarks.source})`)
   stopSpinner(`Loaded ${benchmarkCount} benchmark entries (${benchmarks.source})`)
 
-  // Step 4: Score and rank
+  // Step 4: Score and rank (apply local bench calibration when present)
   startSpinner('Scoring models...')
+  const calibration = await readCalibration()
+  if (calibration) {
+    verboseLog(`Speed calibration: ${calibration.ratio}x (from bench on ${calibration.model})`)
+  }
   const results = scoreModels(
     catalog.models,
     benchmarks.scores,
     hardware,
-    { topN: options.top ?? 10, task: options.task },
+    { topN: options.top ?? 10, task: options.task, speedCalibrationRatio: calibration?.ratio },
   )
   stopSpinner(`${results.length} models scored`)
 
