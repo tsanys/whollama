@@ -20,6 +20,8 @@ export interface BenchmarkResult {
   source: 'cache' | 'live' | 'curated'
 }
 
+export const MIN_LIVE_SCORES = 10
+
 export async function getBenchmarkScores(
   options: BenchmarkOptions = {},
 ): Promise<BenchmarkResult> {
@@ -36,7 +38,21 @@ export async function getBenchmarkScores(
   // Step 2: Fetch live data (skip if offline)
   if (!offline) {
     const liveScores = await fetchLiveScores()
-    if (liveScores) {
+    if (liveScores && Object.keys(liveScores).length >= MIN_LIVE_SCORES) {
+      // Merge curated fallback for models missing from live (keeps offline value prop)
+      const curated = await loadCuratedBenchmarks()
+      for (const [key, entry] of Object.entries(curated)) {
+        if (!(key in liveScores)) {
+          liveScores[key] = {
+            model_id: (entry as BenchmarkScore).model_id ?? key,
+            score: (entry as BenchmarkScore).score ?? 0,
+            tier: 'curated',
+            sources: (entry as BenchmarkScore).sources ?? {},
+            last_updated:
+              (entry as BenchmarkScore).last_updated ?? new Date().toISOString(),
+          }
+        }
+      }
       await writeBenchmarkCache(liveScores)
       return { scores: liveScores, source: 'live' }
     }
@@ -110,8 +126,15 @@ async function loadCuratedBenchmarks(): Promise<
 > {
   try {
     const data = await fs.readFile(FALLBACK_PATH, 'utf-8')
-    return JSON.parse(data)
+    const parsed = JSON.parse(data) as Record<string, BenchmarkScore>
+    // Normalize entries missing model_id (bundled JSON uses key as id)
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (!entry.model_id) entry.model_id = key
+    }
+    return parsed
   } catch {
     return {}
   }
 }
+
+export { loadCuratedBenchmarks }

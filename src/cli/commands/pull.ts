@@ -14,12 +14,23 @@ export interface PullOptions {
   vram?: number
 }
 
+export function validateModelName(model: string): string {
+  const trimmed = model.trim()
+  if (!trimmed) throw new Error('Model name is required')
+  // Allow only ollama-style names: letters, numbers, . _ - : / (no shell metachars, no ANSI)
+  if (!/^[A-Za-z0-9._\-:/]+$/.test(trimmed) || trimmed.length > 128) {
+    throw new Error(`Invalid model name "${model}"`)
+  }
+  return trimmed
+}
+
 export async function pullCommand(options: PullOptions): Promise<void> {
-  // If a model name is provided directly, pull it
+  // If a model name is provided directly, validate then pull it
   if (options.model) {
-    console.log(`Pulling ${options.model}...`)
+    const safeModel = validateModelName(options.model)
+    console.log(`Pulling ${safeModel}...`)
     try {
-      await execa('ollama', ['pull', options.model], {
+      await execa('ollama', ['pull', safeModel], {
         stdio: 'inherit',
       })
     } catch (err) {

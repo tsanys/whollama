@@ -1,15 +1,33 @@
 import { getCatalog } from '../../catalog/index.js'
 import { getBenchmarkScores } from '../../benchmarks/index.js'
 import { resolveScore, normalize } from '../../benchmarks/resolver.js'
+import { detectHardware } from '../../hardware/index.js'
+import { scoreModel } from '../../scorer/composite.js'
+import type { HardwareOverride } from '../../hardware/types.js'
 import { startSpinner, updateSpinner, stopSpinner } from '../spinner.js'
 import { renderModelInfo } from '../display.js'
 import { setVerbose } from '../../utils/logger.js'
-import type { ScoredModel } from '../../scorer/types.js'
 
 export interface InfoOptions {
   modelName: string
   offline?: boolean
   verbose?: boolean
+  gpu?: string
+  ram?: number
+  vram?: number
+}
+
+export function findModel(
+  models: { name: string }[],
+  searchName: string,
+): number {
+  const lower = searchName.toLowerCase()
+  // Exact → prefix → substring (first match wins, deterministic)
+  let idx = models.findIndex((m) => m.name.toLowerCase() === lower)
+  if (idx >= 0) return idx
+  idx = models.findIndex((m) => m.name.toLowerCase().startsWith(lower))
+  if (idx >= 0) return idx
+  return models.findIndex((m) => m.name.toLowerCase().includes(lower))
 }
 
 export async function infoCommand(options: InfoOptions): Promise<void> {
@@ -24,14 +42,9 @@ export async function infoCommand(options: InfoOptions): Promise<void> {
   })
   stopSpinner('Catalog loaded')
 
-  // Find model by name (fuzzy matching)
-  const searchName = options.modelName.toLowerCase()
-  const model = catalog.models.find(
-    (m) =>
-      m.name.toLowerCase() === searchName ||
-      m.name.toLowerCase().startsWith(searchName) ||
-      m.name.toLowerCase().includes(searchName),
-  )
+  // Find model by name (exact → prefix → substring)
+  const idx = findModel(catalog.models, options.modelName)
+  const model = idx >= 0 ? catalog.models[idx] : undefined
 
   if (!model) {
     console.error(`Model "${options.modelName}" not found in catalog.`)
@@ -39,29 +52,36 @@ export async function infoCommand(options: InfoOptions): Promise<void> {
     process.exit(1)
   }
 
+  startSpinner('Detecting hardware...')
+  const overrides: HardwareOverride = {}
+  if (options.gpu) overrides.gpu = options.gpu
+  if (options.ram) overrides.ram = options.ram
+  if (options.vram) overrides.vram = options.vram
+  const hardware = await detectHardware(overrides)
+  stopSpinner('Hardware detected')
+
   startSpinner('Loading benchmark scores...')
   const benchmarks = await getBenchmarkScores({ offline: options.offline })
   stopSpinner('Benchmarks loaded')
 
-  // Build flat score map with normalized keys
+  // Build flat score maps with normalized keys (preserve curated tier)
   const allScores = new Map<string, number>()
+  const curatedScores = new Map<string, number>()
   for (const [key, bs] of Object.entries(benchmarks.scores)) {
     const id = bs.model_id || key
-    allScores.set(normalize(id), bs.score)
+    const norm = normalize(id)
+    if (bs.tier === 'curated') {
+      if (!curatedScores.has(norm)) curatedScores.set(norm, bs.score)
+    } else {
+      allScores.set(norm, bs.score)
+    }
   }
 
-  const benchmark = resolveScore(model.name, allScores)
+  const benchmark = resolveScore(model.name, allScores, curatedScores)
 
-  // Build a ScoredModel-like object for display
-  const displayModel: ScoredModel = {
-    ...model,
-    rank: 1,
-    composite_score: benchmark?.score ?? 0,
-    speed_tps: 0,
-    vram_fit: 'full',
-    benchmark_tier: benchmark?.tier ?? 'none',
-    pull_command: `ollama pull ${model.name}`,
-  }
+  // Real composite scoring (speed + VRAM fit, not hardcoded zeros)
+  const displayModel = scoreModel(model, benchmark, hardware)
+  displayModel.rank = 1
 
   console.log(renderModelInfo(displayModel))
 }

@@ -34,23 +34,26 @@ async function tryFetchEndpoint(url: string): Promise<Map<string, number>> {
         const e = entry as Record<string, unknown>
         const name = (e.model ?? e.name) as string | undefined
         const avg = (e.average ?? e.average_score) as number | undefined
-        if (name && typeof avg === 'number') {
-          scores.set(normalizeModelName(name), normalizeScore(avg, 0, 1))
+        if (name && typeof avg === 'number' && Number.isFinite(avg)) {
+          const norm = normalizeAverage(avg)
+          if (norm !== null) scores.set(normalizeModelName(name), norm)
         }
       }
     } else if (typeof data === 'object' && data !== null) {
       // Object format: { "model_name": { "average": 0.75, ... }, ... }
+      // NOTE: never treat bare numbers as scores — HF API top-level
+      // numeric fields are metadata (downloads, likes) not model scores.
       const obj = data as Record<string, unknown>
       for (const [modelKey, value] of Object.entries(obj)) {
         if (typeof value === 'object' && value !== null) {
           const v = value as Record<string, unknown>
           const avg = (v.average ?? v.average_score) as number | undefined
-          if (typeof avg === 'number') {
-            scores.set(normalizeModelName(modelKey), normalizeScore(avg, 0, 1))
+          if (typeof avg === 'number' && Number.isFinite(avg)) {
+            const norm = normalizeAverage(avg)
+            if (norm !== null) scores.set(normalizeModelName(modelKey), norm)
           }
-        } else if (typeof value === 'number') {
-          scores.set(normalizeModelName(modelKey), normalizeScore(value, 0, 1))
         }
+        // bare numbers ignored by design (see NOTE above)
       }
     }
 
@@ -58,6 +61,13 @@ async function tryFetchEndpoint(url: string): Promise<Map<string, number>> {
   } catch {
     return new Map()
   }
+}
+
+function normalizeAverage(avg: number): number | null {
+  // 0..1 scale (expected) → 0..100; 1..100 scale → as-is; else metadata → reject
+  if (avg >= 0 && avg <= 1) return normalizeScore(avg, 0, 1)
+  if (avg > 1 && avg <= 100) return Math.round(avg * 10) / 10
+  return null
 }
 
 function normalizeScore(score: number, min: number, max: number): number {

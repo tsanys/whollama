@@ -18,7 +18,7 @@ export const QUANT_BITS: Record<string, number> = {
 export function normalizeModelName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[\/:]/g, ' ')
+    .replace(/[/:]/g, ' ')
     .replace(/[-_]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

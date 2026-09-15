@@ -20,12 +20,19 @@ export function scoreModels(
 ): ScoredModel[] {
   const { topN = 10, task, showAll = false } = options
 
-  // Build flat score map for resolver lookup (model → score)
-  // Normalize keys so both catalog names and benchmark keys match
+  // Build flat score maps for resolver lookup (model → score)
+  // Normalize keys so both catalog names and benchmark keys match.
+  // Keep curated entries separate so resolver can return tier 'curated'.
   const allScores = new Map<string, number>()
+  const curatedScores = new Map<string, number>()
   for (const [key, bs] of Object.entries(benchmarks)) {
     const id = bs.model_id || key
-    allScores.set(normalize(id), bs.score)
+    const norm = normalize(id)
+    if (bs.tier === 'curated') {
+      if (!curatedScores.has(norm)) curatedScores.set(norm, bs.score)
+    } else {
+      allScores.set(norm, bs.score)
+    }
   }
 
   // Filter and score all candidates
@@ -51,8 +58,8 @@ export function scoreModels(
       if (!model.tags.includes(mappedTask as never)) continue
     }
 
-    // Resolve benchmark score
-    const benchmark = resolveScore(model.name, allScores)
+    // Resolve benchmark score (live first, curated fallback preserves tier)
+    const benchmark = resolveScore(model.name, allScores, curatedScores)
 
     // Score the model
     const scoredModel = scoreModel(model, benchmark, hardware)

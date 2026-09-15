@@ -1,6 +1,12 @@
 import { parse as parseHTML, HTMLElement } from 'node-html-parser'
 import { safeFetch } from '../utils/fetch.js'
+import { estimateVramGb } from '../scorer/vram.js'
 import type { OllamaModel, ModelTag, CatalogProgressCallback } from './types.js'
+
+export interface CatalogSource {
+  name: string
+  fetch(onProgress?: CatalogProgressCallback): Promise<OllamaModel[]>
+}
 
 interface ScrapedModelInfo {
   name: string
@@ -9,14 +15,26 @@ interface ScrapedModelInfo {
   tags: ModelTag[]
 }
 
-function parsePulls(text: string): number {
-  const cleaned = text.replace(/[^0-9.]/g, '')
-  if (cleaned.endsWith('M')) return parseFloat(cleaned) * 1_000_000
-  if (cleaned.endsWith('K')) return parseFloat(cleaned) * 1_000
-  return parseFloat(cleaned) || 0
+/** Strip ANSI escapes + control chars from scraped strings (terminal injection hardening). */
+export function sanitizeScraped(text: string): string {
+  return text
+    .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .trim()
 }
 
-function parseTags(labelEls: string[]): ModelTag[] {
+export function parsePulls(text: string): number {
+  const match = text.trim().match(/([\d,.]+)\s*([MK])?\b/i)
+  if (!match) return 0
+  const num = parseFloat(match[1].replace(/,/g, ''))
+  if (!Number.isFinite(num)) return 0
+  const suffix = (match[2] ?? '').toUpperCase()
+  if (suffix === 'M') return Math.round(num * 1_000_000)
+  if (suffix === 'K') return Math.round(num * 1_000)
+  return Math.round(num)
+}
+
+export function parseTags(labelEls: string[]): ModelTag[] {
   const tags: ModelTag[] = []
   for (const text of labelEls) {
     const lower = text.toLowerCase()
@@ -27,7 +45,26 @@ function parseTags(labelEls: string[]): ModelTag[] {
     if (lower.includes('embed')) tags.push('embedding')
   }
   if (tags.length === 0) tags.push('general')
-  return tags
+  return [...new Set(tags)]
+}
+
+/** Prefer spans that explicitly mention pulls; avoid matching description numbers like "7B". */
+function extractPulls(texts: string[]): number {
+  // Pass 1: explicit pulls label, e.g. "1.2M Pulls", "850K pulls", "1,234 pulls"
+  for (const t of texts) {
+    if (/pulls?/i.test(t)) {
+      const v = parsePulls(t)
+      if (v > 0) return v
+    }
+  }
+  // Pass 2: compact "1.2M" / "850K" without label (must have M/K suffix)
+  for (const t of texts) {
+    if (/^\s*[\d,.]+\s*[MK]\s*$/i.test(t.trim())) {
+      const v = parsePulls(t)
+      if (v > 0) return v
+    }
+  }
+  return 0
 }
 
 async function scrapeListPage(
@@ -37,6 +74,11 @@ async function scrapeListPage(
   if (!response || !response.ok) return []
 
   const html = await response.text()
+  return parseCatalogListHtml(html)
+}
+
+/** Pure HTML → items parser (exported for unit tests with fixtures). */
+export function parseCatalogListHtml(html: string): ScrapedModelInfo[] {
   const root = parseHTML(html)
   const items: ScrapedModelInfo[] = []
 
@@ -52,18 +94,14 @@ async function scrapeListPage(
     if (!name || name.includes('/tags')) continue
 
     const p = li.querySelector('p')
-    const description = p?.textContent?.trim() ?? ''
+    const description = sanitizeScraped(p?.textContent?.trim() ?? '')
 
     const spans = li.querySelectorAll('span')
-    const texts = spans.map((s: HTMLElement) => s.textContent?.trim() ?? '')
+    const texts = spans.map((s: HTMLElement) =>
+      sanitizeScraped(s.textContent?.trim() ?? ''),
+    )
 
-    let pulls = 0
-    for (const t of texts) {
-      if (/[0-9.]+[MK]/.test(t) || /[0-9,]+/.test(t)) {
-        pulls = parsePulls(t)
-        break
-      }
-    }
+    const pulls = extractPulls(texts)
 
     const tags = parseTags(texts)
 
@@ -73,7 +111,10 @@ async function scrapeListPage(
   return items
 }
 
-async function scrapeTagVariants(
+export const QUANT_TAG_PATTERN = /(Q[2-8](?:_K_[SML]|_[01])?|F16|F32)/i
+export const SIZE_PATTERN = /(\d+(?:\.\d+)?)\s*[bB]\b/
+
+export async function scrapeTagVariants(
   modelName: string,
 ): Promise<
   Array<{ name: string; params_b: number; quant: string }>
@@ -91,17 +132,15 @@ async function scrapeTagVariants(
     const cells = row.querySelectorAll('td')
     if (cells.length < 3) continue
 
-    const tagName = cells[0]?.textContent?.trim()
+    const tagName = sanitizeScraped(cells[0]?.textContent?.trim() ?? '')
     if (!tagName || tagName === 'Tags') continue
 
-    const quantMatch = tagName.match(
-      /(Q[2-8]_K_[SML]|Q[2-8]_0|F16|F32)/i,
-    )
-    const sizeMatch = tagName.match(/(\d+\.?\d*)\s*B/i)
+    const quantMatch = tagName.match(QUANT_TAG_PATTERN)
+    const sizeMatch = tagName.match(SIZE_PATTERN)
 
     if (quantMatch && sizeMatch) {
       variants.push({
-        name: `${modelName}:${tagName.replace(/^.*?:?/, '')}`,
+        name: `${modelName}:${tagName}`,
         params_b: parseFloat(sizeMatch[1]),
         quant: quantMatch[1].toUpperCase(),
       })
@@ -111,17 +150,17 @@ async function scrapeTagVariants(
   return variants
 }
 
-function modelFromVariants(
+export function modelFromVariants(
   item: ScrapedModelInfo,
   variants: Array<{ name: string; params_b: number; quant: string }>,
 ): OllamaModel[] {
   if (variants.length > 0) {
     return variants.map((v) => {
-      const vramGb = v.params_b * 0.65
-      const ramGb = v.params_b * 0.75
+      const vramGb = estimateVramGb(v.params_b, v.quant)
+      const ramGb = vramGb * 1.2
       return {
-        name: `${item.name}:${v.name.split(':').pop() ?? 'latest'}`,
-        family: item.name,
+        name: sanitizeScraped(`${item.name}:${v.name.split(':').pop() ?? 'latest'}`),
+        family: sanitizeScraped(item.name),
         params_b: v.params_b,
         quant: v.quant,
         vram_required_gb: parseFloat(vramGb.toFixed(1)),
@@ -169,8 +208,32 @@ async function concurrentMap<T, R>(
 }
 
 const CONCURRENCY = 5
+const SCRAPE_OVERALL_TIMEOUT_MS = 45_000
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms)
+  })
+  return Promise.race([p, timeout]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
+}
+
+export class HtmlScrapeSource implements CatalogSource {
+  name = 'live-html'
+  fetch(onProgress?: CatalogProgressCallback): Promise<OllamaModel[]> {
+    return scrapeCatalog(onProgress)
+  }
+}
 
 export async function scrapeCatalog(
+  onProgress?: CatalogProgressCallback,
+): Promise<OllamaModel[]> {
+  return withTimeout(scrapeCatalogInner(onProgress), SCRAPE_OVERALL_TIMEOUT_MS, [])
+}
+
+async function scrapeCatalogInner(
   onProgress?: CatalogProgressCallback,
 ): Promise<OllamaModel[]> {
   const baseUrl = 'https://ollama.com/library?sort=popular'

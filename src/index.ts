@@ -41,27 +41,67 @@ program
     }
   })
 
+const VALID_TASKS = new Set([
+  'coding',
+  'vision',
+  'math',
+  'tools',
+  'embedding',
+  'general',
+])
+
+function parsePositiveInt(value: string): number {
+  const n = parseInt(value, 10)
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`Expected a positive integer, got "${value}"`)
+  }
+  return n
+}
+
+function parseOptionalPositiveInt(value: string): number {
+  return parsePositiveInt(value)
+}
+
+function validateTask(task: string | undefined): string | undefined {
+  if (task === undefined) return undefined
+  if (!VALID_TASKS.has(task)) {
+    throw new Error(
+      `Invalid --task "${task}". Valid: ${[...VALID_TASKS].join(', ')}`,
+    )
+  }
+  return task
+}
+
+function validateRamVram(n: number | undefined, flag: string): number | undefined {
+  if (n === undefined) return undefined
+  if (!Number.isFinite(n) || n <= 0 || n > 4096) {
+    throw new Error(`Invalid --${flag} "${n}". Expected 1..4096 GB.`)
+  }
+  return n
+}
+
 // Default command: recommend
 program
   .command('recommend', { isDefault: true, hidden: true })
   .description('Recommend the best models for your hardware (default)')
-  .option('--top <n>', 'Number of results to show', parseInt, 10)
-  .option('--task <type>', 'Filter by task (coding, vision, math, general)')
+  .option('--top <n>', 'Number of results to show (1-100)', parsePositiveInt, 10)
+  .option('--task <type>', 'Filter by task (coding, vision, math, tools, embedding, general)')
   .option('--json', 'Output as JSON')
   .option('--gpu <spec>', 'Override GPU (e.g. "RTX 4090", "M2 Max")')
-  .option('--ram <gb>', 'Override RAM in GB', parseInt)
-  .option('--vram <gb>', 'Override VRAM in GB', parseInt)
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
   .action(async (opts) => {
     try {
+      const top = Math.min(opts.top ?? 10, 100)
       await recommendCommand({
-        top: opts.top,
-        task: opts.task,
+        top,
+        task: validateTask(opts.task),
         json: opts.json,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
         gpu: opts.gpu,
-        ram: opts.ram,
-        vram: opts.vram,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
       })
     } catch (err) {
       failSpinner('An error occurred')
@@ -75,24 +115,24 @@ program
   .command('pull')
   .description('Pull a model interactively')
   .argument('[model]', 'Model name to pull directly')
-  .option('--top <n>', 'Number of results to show', parseInt, 10)
-  .option('--task <type>', 'Filter by task')
+  .option('--top <n>', 'Number of results to show (1-100)', parsePositiveInt, 10)
+  .option('--task <type>', 'Filter by task (coding, vision, math, tools, embedding, general)')
   .option('--json', 'Output as JSON')
   .option('--gpu <spec>', 'Override GPU')
-  .option('--ram <gb>', 'Override RAM in GB', parseInt)
-  .option('--vram <gb>', 'Override VRAM in GB', parseInt)
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
   .action(async (model: string | undefined, opts) => {
     try {
       await pullCommand({
         model,
-        top: opts.top,
-        task: opts.task,
+        top: Math.min(opts.top ?? 10, 100),
+        task: validateTask(opts.task),
         json: opts.json,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
         gpu: opts.gpu,
-        ram: opts.ram,
-        vram: opts.vram,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
       })
     } catch (err) {
       failSpinner('An error occurred')
@@ -105,23 +145,23 @@ program
 program
   .command('list')
   .description('List all models that fit your hardware')
-  .option('--task <type>', 'Filter by task')
+  .option('--task <type>', 'Filter by task (coding, vision, math, tools, embedding, general)')
   .option('--all', 'Include models that do not fit')
   .option('--json', 'Output as JSON')
   .option('--gpu <spec>', 'Override GPU')
-  .option('--ram <gb>', 'Override RAM in GB', parseInt)
-  .option('--vram <gb>', 'Override VRAM in GB', parseInt)
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
   .action(async (opts) => {
     try {
       await listCommand({
-        task: opts.task,
+        task: validateTask(opts.task),
         all: opts.all,
         json: opts.json,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
         gpu: opts.gpu,
-        ram: opts.ram,
-        vram: opts.vram,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
       })
     } catch (err) {
       failSpinner('An error occurred')
@@ -135,12 +175,19 @@ program
   .command('info')
   .description('Show detailed info about a model')
   .argument('<model>', 'Model name (e.g. qwen3:14b)')
-  .action(async (model: string) => {
+  .option('--gpu <spec>', 'Override GPU')
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
+  .action(async (model: string, opts) => {
     try {
+      if (!model || !model.trim()) throw new Error('Model name is required')
       await infoCommand({
-        modelName: model,
+        modelName: model.trim(),
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
+        gpu: opts.gpu,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
       })
     } catch (err) {
       failSpinner('An error occurred')

@@ -1,6 +1,6 @@
 import type { BenchmarkScore } from './types.js'
 
-const QUANT_PATTERN = /(?:Q[2-8]_K_[SML]|Q[2-8]_0|F16|F32)/gi
+const QUANT_PATTERN = /(?:Q[2-8](?:_K_[SML]|_[01])?|F16|F32)/gi
 const SUFFIX_PATTERN = /\b(instruct|chat|it)\b/gi
 
 /**
@@ -106,17 +106,28 @@ export function resolveScore(
     }
   }
 
-  // Tier 4: Curated fallback
+  // Tier 4: Curated fallback (normalized lookup, not raw modelName)
   if (curatedScores) {
-    // Try direct match in curated
-    const curatedMatch = curatedScores.get(modelName)
-    if (curatedMatch !== undefined) {
+    const curatedDirect = curatedScores.get(normalized)
+    if (curatedDirect !== undefined) {
       return {
         model_id: modelName,
-        score: curatedMatch,
+        score: curatedDirect,
         tier: 'curated',
         sources: {},
         last_updated: new Date().toISOString(),
+      }
+    }
+    if (tagVariant) {
+      const curatedVariant = curatedScores.get(tagVariant)
+      if (curatedVariant !== undefined) {
+        return {
+          model_id: modelName,
+          score: curatedVariant,
+          tier: 'curated',
+          sources: {},
+          last_updated: new Date().toISOString(),
+        }
       }
     }
   }

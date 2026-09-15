@@ -24,11 +24,15 @@ npx @tsany/whollama              # zero-install, always latest
 
 ```
 whollama                  # Show top 10 recommended models
-whollama --top 5          # Show top 5
-whollama --task coding    # Filter by task (coding, vision, math, general)
+whollama --top 5          # Show top 5 (1-100)
+whollama --task coding    # Filter by task (coding, vision, math, tools, embedding, general)
 whollama --json           # JSON output for scripting
-whollama --offline        # Force offline mode
+whollama --offline        # Force offline mode (bundled catalog + scores)
 whollama --verbose        # Show scoring breakdown
+whollama --no-color       # Disable colored output
+
+whollama --gpu "RTX 4090" --ram 32   # Simulate hardware (planning)
+whollama --gpu "M2 Max" --vram 32
 
 whollama pull             # Interactive model pull
 whollama pull qwen3:14b   # Pull a specific model
@@ -85,6 +89,23 @@ Running local LLMs via Ollama requires answering two questions that are hard to 
 2. **Which of those is actually the best?** — Parameter count is a poor proxy for quality
 
 whollama answers both in a single command.
+
+## Offline & caching
+
+No network? No problem — whollama ships a bundled catalog and benchmark scores:
+
+| Cache file | TTL | Contents |
+|---|---|---|
+| `~/.whollama/catalog.json` | 24 hours | Scraped Ollama library models |
+| `~/.whollama/benchmarks.json` | 7 days | Merged benchmark scores |
+
+`whollama --offline` skips all network requests and uses the cache (or the bundle on first run). Tiny or corrupt caches are ignored automatically and fall back to the next source.
+
+## Requirements & troubleshooting
+
+- **Node.js ≥ 20** (CI-tested on 20 and 22).
+- **Ollama** must be installed for `whollama pull` — see [ollama.com](https://ollama.com). Without it, recommendation commands (`default`, `list`, `info`) still work; only `pull` fails with `Failed to pull model`.
+- **No models match?** Your hardware filter excluded everything — try `whollama list --all` or simulate with `--gpu "RTX 4090"`.
 
 ## License
 

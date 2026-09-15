@@ -1,4 +1,3 @@
-import * as os from 'os'
 import type { HardwareInfo, HardwareOverride } from './types.js'
 import { detectAppleGpu } from './apple.js'
 import { detectNvidiaGpu } from './nvidia.js'
