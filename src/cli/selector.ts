@@ -161,6 +161,13 @@ export async function selectInteractive<T>(
   })
 }
 
+/** Parse a numbered answer into a 0-based index, or null (quit/invalid). */
+export function parseSelectionAnswer(answer: string, count: number): number | null {
+  const num = parseInt(answer.trim(), 10)
+  if (isNaN(num) || num < 1 || num > count) return null
+  return num - 1
+}
+
 async function numberedFallback<T>(
   choices: SelectChoice<T>[],
   prompt: string,
@@ -181,7 +188,7 @@ async function numberedFallback<T>(
   })
   rl.close()
 
-  const num = parseInt(answer, 10)
-  if (isNaN(num) || num < 1 || num > shown.length) return null
-  return shown[num - 1].value
+  const num = parseSelectionAnswer(answer, shown.length)
+  if (num === null) return null
+  return shown[num].value
 }

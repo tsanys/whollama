@@ -47,6 +47,33 @@ function getBandwidth(gpuName: string): number {
 
 export { getBandwidth as getAmdBandwidth }
 
+export interface AmdSmiDevice {
+  vramMb: number
+  cardName: string
+}
+
+/** Parse one rocm-smi device entry. Null = unusable entry. */
+export function parseAmdSmi(firstDevice: RocmSmiOutput[string]): AmdSmiDevice | null {
+  if (!firstDevice) return null
+
+  const vramStr = firstDevice['VRAM Total']
+  if (!vramStr) return null
+
+  // Format: "16368 MB" or "16368M"
+  const match = vramStr.match(/(\d+)/)
+  if (!match) return null
+
+  const vramMb = parseInt(match[1], 10)
+  const vramGb = vramMb / 1024
+
+  const cardName =
+    firstDevice['Card SKU'] ??
+    firstDevice['Card series'] ??
+    `AMD GPU (${vramGb.toFixed(0)} GB)`
+
+  return { vramMb, cardName }
+}
+
 export async function detectAmdGpu(): Promise<HardwareGpu | null> {
   try {
     // Check if rocm-smi exists
@@ -63,30 +90,16 @@ export async function detectAmdGpu(): Promise<HardwareGpu | null> {
     )
 
     const data: RocmSmiOutput = JSON.parse(stdout)
-    const firstDevice = Object.values(data)[0]
+    const parsed = parseAmdSmi(Object.values(data)[0])
+    if (!parsed) return null
 
-    if (!firstDevice) return null
-
-    const vramStr = firstDevice['VRAM Total']
-    if (!vramStr) return null
-
-    // Format: "16368 MB" or "16368M"
-    const match = vramStr.match(/(\d+)/)
-    if (!match) return null
-
-    const vramMb = parseInt(match[1], 10)
-    const vramGb = vramMb / 1024
-
-    const cardName =
-      firstDevice['Card SKU'] ??
-      firstDevice['Card series'] ??
-      `AMD GPU (${vramGb.toFixed(0)} GB)`
+    const vramGb = parsed.vramMb / 1024
 
     return {
-      name: cardName,
+      name: parsed.cardName,
       vendor: 'amd',
       vram_gb: vramGb,
-      bandwidth_gbps: getBandwidth(cardName),
+      bandwidth_gbps: getBandwidth(parsed.cardName),
       unified: false,
     }
   } catch {

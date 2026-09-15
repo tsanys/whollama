@@ -38,7 +38,7 @@ function getBandwidth(chipName: string): number {
 
 export { getBandwidth as getAppleBandwidth }
 
-function parseMemoryGb(memoryStr: string): number {
+export function parseMemoryGb(memoryStr: string): number {
   const match = memoryStr.match(/(\d+(?:\.\d+)?)\s*GB/)
   return match ? parseFloat(match[1]) : 16
 }

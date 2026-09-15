@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseNvidiaSmi, selectPrimaryGpu, getNvidiaBandwidth } from '../src/hardware/nvidia.js'
-import { getAppleBandwidth } from '../src/hardware/apple.js'
-import { getAmdBandwidth } from '../src/hardware/amd.js'
+import { getAppleBandwidth, parseMemoryGb } from '../src/hardware/apple.js'
+import { getAmdBandwidth, parseAmdSmi } from '../src/hardware/amd.js'
 
 describe('parseNvidiaSmi', () => {
   it('parses single GPU', () => {
@@ -69,5 +69,37 @@ describe('bandwidth tables (spot checks incl. 2025-2026 SKUs)', () => {
     expect(getAmdBandwidth('AMD Radeon RX 9060')).toBe(288)
     expect(getAmdBandwidth('AMD Instinct MI300X')).toBe(5300)
     expect(getAmdBandwidth('AMD Radeon RX 7900 XTX')).toBe(960)
+  })
+})
+
+describe('parseAmdSmi', () => {
+  it('prefers Card SKU, parses MB VRAM', () => {
+    expect(
+      parseAmdSmi({ 'VRAM Total': '16368 MB', 'Card SKU': 'RX 7900 XTX', 'Card series': 'RX 7900' }),
+    ).toEqual({ vramMb: 16368, cardName: 'RX 7900 XTX' })
+  })
+  it('falls back to Card series, then generic name', () => {
+    expect(parseAmdSmi({ 'VRAM Total': '16368M', 'Card series': 'RX 7800' })).toEqual({
+      vramMb: 16368,
+      cardName: 'RX 7800',
+    })
+    expect(parseAmdSmi({ 'VRAM Total': '8192 MB' })).toEqual({
+      vramMb: 8192,
+      cardName: 'AMD GPU (8 GB)',
+    })
+  })
+  it('returns null for missing/empty/unparseable entries', () => {
+    expect(parseAmdSmi(undefined as never)).toBeNull()
+    expect(parseAmdSmi({} as never)).toBeNull()
+    expect(parseAmdSmi({ 'VRAM Total': 'unknown' })).toBeNull()
+  })
+})
+
+describe('parseMemoryGb', () => {
+  it('parses GB strings, defaults to 16', () => {
+    expect(parseMemoryGb('16 GB')).toBe(16)
+    expect(parseMemoryGb('128GB')).toBe(128)
+    expect(parseMemoryGb('n/a')).toBe(16)
+    expect(parseMemoryGb('')).toBe(16)
   })
 })

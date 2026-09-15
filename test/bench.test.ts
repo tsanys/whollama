@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { tpsFromEval, calibrationRatio } from '../src/bench/runner.js'
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { mkdtempSync, rmSync } from 'fs'
+import { tpsFromEval, calibrationRatio, listLocalModels, readCalibration, writeCalibration } from '../src/bench/runner.js'
 import { scoreModel } from '../src/scorer/composite.js'
 import { scoreModels } from '../src/scorer/index.js'
 import type { HardwareInfo } from '../src/hardware/types.js'
@@ -69,5 +72,55 @@ describe('calibration in scoring', () => {
     const base = scoreModel(model(), null, hw)
     expect(scoreModel(model(), null, hw, NaN).speed_tps).toBe(base.speed_tps)
     expect(scoreModel(model(), null, hw, -2).speed_tps).toBe(base.speed_tps)
+  })
+})
+
+describe('listLocalModels (mocked daemon)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  function mockTags(body: unknown): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => body }) as Response),
+    )
+  }
+  it('lists model names, skips nameless entries', async () => {
+    mockTags({ models: [{ name: 'a:latest' }, {}, { name: '' }] })
+    expect(await listLocalModels()).toEqual(['a:latest'])
+  })
+  it('returns [] when daemon unreachable, body invalid, or shape wrong', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => null));
+    expect(await listLocalModels()).toEqual([])
+    mockTags({ models: 'nope' })
+    expect(await listLocalModels()).toEqual([])
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad') } }) as Response),
+    )
+    expect(await listLocalModels()).toEqual([])
+  })
+})
+
+describe('calibration persistence (isolated tmp dir)', () => {
+  const TMP = mkdtempSync(join(tmpdir(), 'whollama-bench-test-'))
+  beforeAll(() => {
+    process.env.WHOLLAMA_DIR = TMP
+  })
+  afterAll(() => {
+    rmSync(TMP, { recursive: true, force: true })
+  })
+  it('roundtrips write → read, null when absent', async () => {
+    expect(await readCalibration()).toBeNull()
+    const cal = {
+      vendor: 'apple',
+      ratio: 0.49,
+      measured_tps: 21,
+      estimated_tps: 43,
+      model: 'llama3.1:latest',
+      at: new Date().toISOString(),
+    }
+    await writeCalibration(cal)
+    expect(await readCalibration()).toEqual(cal)
   })
 })

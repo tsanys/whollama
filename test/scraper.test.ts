@@ -72,6 +72,10 @@ describe('parseTagVariant', () => {
   it('parses MoE tags by total params', () => {
     expect(parseTagVariant('qwen3', '235b-a22b-q4_K_M')).toMatchObject({ params_b: 235, quant: 'Q4_K_M' })
   })
+  it('parses vendor-prefixed sizes (gemma3n e2b/e4b)', () => {
+    expect(parseTagVariant('gemma3n', 'e2b')).toMatchObject({ params_b: 2, quant: 'Q4_K_M' })
+    expect(parseTagVariant('gemma3n', 'e4b-it-q4_K_M')).toMatchObject({ params_b: 4, quant: 'Q4_K_M' })
+  })
   it('parses million-param tags (270m → 0.27B)', () => {
     expect(parseTagVariant('gemma3', '270m')).toMatchObject({ params_b: 0.27 })
     expect(parseTagVariant('gemma3', '270m-it-q8_0')).toMatchObject({ params_b: 0.27, quant: 'Q8_0' })
