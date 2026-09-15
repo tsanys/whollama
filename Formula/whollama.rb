@@ -3,9 +3,9 @@ class Whollama < Formula
   homepage "https://github.com/tsanys/whollama"
   # npm release tarball — URL pattern is stable across versions.
   url "https://registry.npmjs.org/@tsany/whollama/-/whollama-0.2.0.tgz"
-  # Fill on every release: `npm view @tsany/whollama@<version> dist.shasum`
+  # Refresh on every release: `npm view @tsany/whollama@<version> dist.shasum`
   # then `brew audit --new whollama && brew test whollama`.
-  sha256 "TO_FILL_ON_RELEASE"
+  sha256 "28d041f70e4c16bb17bcdae16d8f8f1e24e30d07"
   license "MIT"
 
   depends_on "node"
