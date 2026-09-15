@@ -144,8 +144,8 @@ export function parseCatalogListHtml(html: string): ScrapedModelInfo[] {
   return items
 }
 
-/** Size prefix of a tag: `14b`, `0.6b`, `270m` (millions → ÷1000). */
-export const TAG_SIZE_PATTERN = /^(\d+(?:\.\d+)?)\s*([bBmM])\b/
+/** Size prefix of a tag: `14b`, `0.6b`, `270m` (millions → ÷1000), `e4b` (vendor prefix). */
+export const TAG_SIZE_PATTERN = /^(?:[a-z]+)?(\d+(?:\.\d+)?)\s*([bBmM])\b/i
 /** Quant suffix of a tag (site uses lowercase): `q4_K_M`, `q8_0`, `fp16`, `bf16`. */
 export const TAG_QUANT_PATTERN = /(q\d+_K_[SML]|q\d+_\d+|fp16|bf16)$/i
 

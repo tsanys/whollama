@@ -9,8 +9,9 @@ const EFFICIENCY: Record<string, number> = {
   'cpu-only': 0.7,
 }
 
-// MoE pattern: "8x7b", "A3B", "235b" etc with "MoE" or "A\d+B" in name
-const MOE_NAME_PATTERN = /moe|8x\d+b|\d+x\d+b|a\d+b/i
+// MoE pattern: "8x7b", "A3B", "16e"/"128e" (llama4 expert counts) etc.
+// Only the speed estimate uses active params; VRAM fit always uses full params.
+const MOE_NAME_PATTERN = /moe|8x\d+b|\d+x\d+b|a\d+b|\d+e\b/i
 
 /**
  * Determine active params for a model.

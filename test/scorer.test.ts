@@ -64,6 +64,16 @@ describe('estimateSpeed', () => {
   it('returns 0 for degenerate model', () => {
     expect(estimateSpeed(model({ params_b: 0 }), hw)).toBe(0)
   })
+  it('treats expert-count names (16e) as MoE (active params only)', () => {
+    const moe = estimateSpeed(model({ name: 'llama4:17b-scout-16e', family: 'llama4', params_b: 17 }), hw)
+    const dense = estimateSpeed(model({ name: 'llama4:17b', family: 'llama4', params_b: 17 }), hw)
+    expect(moe).toBeGreaterThan(dense)
+  })
+  it('does not mistake e-prefixed dense sizes (e2b) for MoE', () => {
+    const a = estimateSpeed(model({ name: 'gemma3n:e2b', family: 'gemma3n', params_b: 5 }), hw)
+    const b = estimateSpeed(model({ name: 'gemma3n:x2b', family: 'gemma3n', params_b: 5 }), hw)
+    expect(a).toBe(b)
+  })
 })
 
 describe('recencyMultiplier', () => {
