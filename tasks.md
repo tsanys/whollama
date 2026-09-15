@@ -253,7 +253,7 @@ Status legend: `[ ]` todo · `[x]` done · `[-]` skipped/deferred
 
 - [x] **T-067** Publish to npm
   - `npm publish --access public`
-  - Verify `npx whollama` works
+  - Verify `npx @tsany/whollama` works (scoped name; bare `npx whollama` does not exist on npm)
 
 - [x] **T-068** Write GitHub Actions CI
   - Lint + type-check on push

@@ -8,9 +8,9 @@ Instructions for the AI agent implementing this project. Read this before writin
 
 **whollama** is a TypeScript CLI tool (npm package) that detects local hardware and recommends the best Ollama models to run, ranked by real benchmark scores.
 
-- Entry: `npx whollama`
+- Entry: `npx @tsany/whollama`
 - Docs: See `PRD.md` (what), `ARCHITECTURE.md` (how), `TASKS.md` (checklist)
-- Stack: TypeScript ESM, Node.js ≥18, Commander.js, no bundler
+- Stack: TypeScript ESM, Node.js ≥20, Commander.js, no bundler
 
 ---
 

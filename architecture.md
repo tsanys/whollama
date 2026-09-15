@@ -288,11 +288,11 @@ Storage helpers live in `src/utils/storage.ts`. All reads/writes go through this
 ## Distribution
 
 ```
-npm publish → npmjs.com/package/whollama
+npm publish → npmjs.com/package/@tsany/whollama
 
 Usage:
-  npx whollama              # zero-install, always latest
-  npm install -g whollama   # global install
+  npx @tsany/whollama              # zero-install, always latest (or: npx -p @tsany/whollama whollama)
+  npm install -g @tsany/whollama   # global install
 ```
 
 The `data/` directory (curated catalog + benchmarks) is included in the npm package via `files` in `package.json`. The `docs/` and `src/` are excluded from the published package via `.npmignore`.

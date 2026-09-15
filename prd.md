@@ -261,13 +261,13 @@ All data stored in `~/.whollama/`:
 | Spinner | ora | Standard |
 | HTML parsing | node-html-parser | For ollama.com scrape |
 | Build | tsc | Simple, no bundler needed |
-| Distribution | npm (`npx whollama`) | Zero-install friction |
+| Distribution | npm (`npx @tsany/whollama`) | Zero-install friction |
 
 ---
 
 ## 10. Success Metrics
 
-- `npx whollama` cold start < 3s (excluding catalog fetch)
+- `npx @tsany/whollama` cold start < 3s (excluding catalog fetch)
 - Top recommendation matches what community considers best for that hardware class
 - Works fully offline with curated fallback
 - Zero required config — works out of the box
