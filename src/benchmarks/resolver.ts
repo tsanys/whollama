@@ -34,12 +34,25 @@ function extractFamily(name: string): string {
 }
 
 /**
+ * Extract parameter size in billions from a normalized name.
+ * "qwen3 14b" → 14, "gemma3n e2b" → 2, "model 334m" → 0.334.
+ * Null when no size token is present.
+ */
+export function extractSizeB(normalized: string): number | null {
+  const m = normalized.match(/(\d+(?:\.\d+)?)\s*([bm])\b/i)
+  if (!m) return null
+  const v = parseFloat(m[1])
+  if (!Number.isFinite(v) || v <= 0) return null
+  return m[2].toLowerCase() === 'm' ? v / 1000 : v
+}
+
+/**
  * Resolve the best benchmark score for a given model name.
  *
  * Resolution order:
  * 1. direct — exact normalized match in scores map
  * 2. variant — same normalized base name with diff tag
- * 3. family — same family, interpolated by size proximity
+ * 3. family — same family, nearest size wins (PRD: interpolated by size)
  * 4. curated — hardcoded fallback
  * 5. none — score = 0
  */
@@ -79,9 +92,12 @@ export function resolveScore(
     }
   }
 
-  // Tier 3: Family match — find models in same family
+  // Tier 3: Family match — same family, nearest size wins. A 2B model must
+  // not inherit a 27B flagship score (the old char-proximity pick did).
+  // Name proximity only breaks ties, and decides alone when no sizes parse.
   const family = extractFamily(modelName)
-  const familyScores: Array<{ key: string; score: number; proximity: number }> = []
+  const modelSize = extractSizeB(normalized)
+  const familyScores: Array<{ key: string; score: number; sizeDist: number; proximity: number }> = []
 
   for (const [key] of allScores) {
     if (key.startsWith(family)) {
@@ -89,14 +105,20 @@ export function resolveScore(
       if (matchedScore !== undefined) {
         // Proximity: prefer names that share more characters with modelName
         const sharedLen = [...normalized].filter((c, i) => c === key[i]).length
-        familyScores.push({ key, score: matchedScore, proximity: sharedLen })
+        const candSize = extractSizeB(key)
+        const sizeDist =
+          modelSize !== null && candSize !== null && candSize > 0
+            ? Math.abs(Math.log(candSize / modelSize))
+            : Number.POSITIVE_INFINITY
+        familyScores.push({ key, score: matchedScore, sizeDist, proximity: sharedLen })
       }
     }
   }
 
   if (familyScores.length > 0) {
-    // Pick the closest family member
-    familyScores.sort((a, b) => b.proximity - a.proximity)
+    // Nearest size first; proximity breaks ties (and rules when all
+    // distances are +Infinity, preserving the old behavior exactly).
+    familyScores.sort((a, b) => a.sizeDist - b.sizeDist || b.proximity - a.proximity)
     return {
       model_id: modelName,
       score: familyScores[0].score,
