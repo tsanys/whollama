@@ -37,9 +37,8 @@ whollama/
 │   │   └── types.ts           # OllamaModel interface
 │   ├── benchmarks/
 │   │   ├── index.ts           # Exports getBenchmarkScores()
-│   │   ├── livebench.ts       # Fetch/parse LiveBench scores
-│   │   ├── arena.ts           # Fetch/parse Chatbot Arena ELO
-│   │   ├── openllm.ts         # Fetch/parse Open LLM Leaderboard
+│   │   ├── livebench.ts       # Fetch/parse LiveBench dated CSV tables
+│   │   │                      # (Arena/OpenLLM endpoints died 2025-2026, removed)
 │   │   ├── resolver.ts        # Match model names → scores (fuzzy)
 │   │   ├── cache.ts           # Read/write ~/.whollama/benchmarks.json
 │   │   └── types.ts           # BenchmarkScore, ScoreTier interfaces
@@ -95,8 +94,8 @@ whollama (CLI invoked)
         │         └── fallback: load data/catalog.json (bundled)
         │
         ├──► getBenchmarkScores()
-        │         ├── try: fetch LiveBench + Arena ELO + Open LLM
-        │         │         └── on success: write cache
+        │         ├── try: fetch LiveBench dated CSVs (newer tables win)
+        │         │         └── on success: merge curated gap-fill, write cache
         │         ├── fallback: read ~/.whollama/benchmarks.json
         │         └── fallback: load data/benchmarks.json (bundled)
         │

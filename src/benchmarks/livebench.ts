@@ -1,68 +1,94 @@
 import { safeFetch } from '../utils/fetch.js'
-import { normalizeModelName } from '../utils/constants.js'
+import { normalize } from './resolver.js'
 
-interface LiveBenchResult {
-  model: string
-  average_score?: number
-  [key: string]: unknown
-}
+const SITE = 'https://livebench.ai'
+
+// Last-known table dates (newest first). The live list is discovered from
+// the site bundle at runtime; this chain is the fallback if discovery fails.
+const KNOWN_TABLES = ['2026_06_25', '2025_05_30', '2025_04_25', '2025_04_02', '2024_11_25']
+const MAX_TABLES = 4
 
 /**
- * Fetch latest scores from LiveBench public data.
- * Try multiple known endpoints, return empty map if all fail.
+ * Fetch LiveBench scores from the site's public dated CSV tables
+ * (verified 2026-09: `table_<YYYY_MM_DD>.csv`, model + 0-100 task columns).
+ * Newer tables win per model. Empty map if all fail.
  */
 export async function fetchLiveBench(): Promise<Map<string, number>> {
-  const endpoints = [
-    'https://livebench.ai/api/v1/results',
-    'https://raw.githubusercontent.com/livebench/livebench/main/data/latest_results.json',
-  ]
-
-  for (const url of endpoints) {
-    const result = await tryFetchEndpoint(url)
-    if (result.size > 0) return result
+  let dates: string[]
+  try {
+    dates = await discoverTableDates()
+  } catch {
+    dates = []
   }
+  const chain = [...dates.slice(-MAX_TABLES), ...KNOWN_TABLES]
+    .filter((d, i, arr) => arr.indexOf(d) === i)
+    .slice(0, MAX_TABLES)
 
-  return new Map()
+  const merged = new Map<string, number>()
+  for (const d of chain) {
+    const table = await fetchTable(d)
+    for (const [name, score] of table) {
+      if (!merged.has(name)) merged.set(name, score)
+    }
+  }
+  return merged
 }
 
-async function tryFetchEndpoint(url: string): Promise<Map<string, number>> {
+/** Discover available table dates from the site's JS bundle. */
+export async function discoverTableDates(): Promise<string[]> {
+  const index = await safeFetch(`${SITE}/`, { timeout: 10000 })
+  if (!index || !index.ok) return []
+  const html = await index.text()
+  const bundle = html.match(/static\/js\/main\.([a-f0-9]+)\.js/)?.[1]
+  if (!bundle) return []
+  const js = await safeFetch(`${SITE}/static/js/main.${bundle}.js`, { timeout: 15000 })
+  if (!js || !js.ok) return []
+  return parseBundleDates(await js.text())
+}
+
+/** Extract the `pe=["YYYY-MM-DD", ...]` table-date list from bundle source. */
+export function parseBundleDates(js: string): string[] {
+  const m = js.match(/pe=\[([^\]]*)\]/)
+  if (!m) return []
+  return [...m[1].matchAll(/"(\d{4}-\d{2}-\d{2})"/g)]
+    .map((x) => x[1].replaceAll('-', '_'))
+    .filter((d, i, arr) => arr.indexOf(d) === i)
+}
+
+async function fetchTable(date: string): Promise<Map<string, number>> {
   try {
-    const response = await safeFetch(url, { timeout: 10000 })
+    const response = await safeFetch(`${SITE}/table_${date}.csv`, { timeout: 15000 })
     if (!response || !response.ok) return new Map()
-
-    const data: LiveBenchResult[] | Record<string, number> =
-      await response.json()
-
-    const scores = new Map<string, number>()
-
-    if (Array.isArray(data)) {
-      for (const entry of data) {
-        if (entry.model && typeof entry.average_score === 'number') {
-          const normalized = normalizeModelName(entry.model)
-          scores.set(normalized, normalizeScore(entry.average_score, 0, 100))
-        }
-      }
-    } else if (typeof data === 'object') {
-      // Flat format: { "model_name": score, ... }
-      for (const [model, score] of Object.entries(data)) {
-        if (typeof score === 'number') {
-          const normalized = normalizeModelName(model)
-          scores.set(normalized, normalizeScore(score, 0, 100))
-        }
-      }
-    }
-
-    return scores
+    return parseTableCsv(await response.text())
   } catch {
     return new Map()
   }
 }
 
-function normalizeScore(
-  score: number,
-  min: number,
-  max: number,
-): number {
-  if (max === min) return 50
-  return Math.round(((score - min) / (max - min)) * 100 * 10) / 10
+/**
+ * Parse one table CSV: first column `model`, remaining columns 0-100 task
+ * scores. Score = unweighted mean of numeric cells (mirrors the site),
+ * rounded to 1 decimal. Keys use the shared name normalizer.
+ */
+export function parseTableCsv(csv: string): Map<string, number> {
+  const scores = new Map<string, number>()
+  const lines = csv.split('\n')
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(',')
+    if (cells.length < 2) continue
+    const name = cells[0].trim().replace(/^"|"$/g, '')
+    if (!name) continue
+    let sum = 0
+    let n = 0
+    for (let j = 1; j < cells.length; j++) {
+      const v = parseFloat(cells[j])
+      if (Number.isFinite(v)) {
+        sum += v
+        n++
+      }
+    }
+    if (n === 0) continue
+    scores.set(normalize(name), Math.round((sum / n) * 10) / 10)
+  }
+  return scores
 }

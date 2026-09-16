@@ -77,8 +77,11 @@ describe('estimateSpeed', () => {
 })
 
 describe('recencyMultiplier', () => {
-  it('fresh → 1.0, old → clamped 0.8', () => {
-    expect(recencyMultiplier(new Date().toISOString())).toBe(1)
+  it('fresh → ~1.0, old → clamped 0.8', () => {
+    // ≈1, not exactly 1: ms truncation between Date.now() calls is racy
+    const fresh = recencyMultiplier(new Date().toISOString())
+    expect(fresh).toBeLessThanOrEqual(1)
+    expect(fresh).toBeGreaterThan(0.99)
     const old = new Date(Date.now() - 24 * 30 * 24 * 3600 * 1000).toISOString()
     expect(recencyMultiplier(old)).toBe(0.8)
   })

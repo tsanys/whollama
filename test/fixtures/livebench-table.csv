@@ -1,0 +1,5 @@
+model,code_generation,math_comp,summarize,typos
+qwen3-32b,80.0,90.0,70.0,60.0
+gpt-oss-120b,70.0,,80.0,50.0
+llama3.1-8b-instruct,60.0,50.0,40.0,30.0
+,10.0,20.0,30.0,40.0

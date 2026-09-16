@@ -55,7 +55,7 @@ whollama update           # Force refresh catalog and benchmarks
 
 - **Hardware auto-detection** — Apple Silicon, NVIDIA, AMD, or CPU-only
 - **Live catalog** — scrapes ollama.com/library for the latest models
-- **Multi-source benchmarks** — LiveBench, Chatbot Arena ELO, Open LLM Leaderboard
+- **Live benchmarks** — LiveBench dated tables, merged with a curated snapshot for full coverage
 - **Smart scoring** — composite score factoring benchmark quality, VRAM fit, speed, and recency
 - **Offline mode** — bundled fallback catalog and scores work without internet
 - **JSON output** — pipe-friendly for scripts and automation

@@ -3,8 +3,6 @@ import * as path from 'path'
 import { fileURLToPath } from 'url'
 import { readBenchmarkCache, writeBenchmarkCache, readStaleBenchmarks } from './cache.js'
 import { fetchLiveBench } from './livebench.js'
-import { fetchArenaElo } from './arena.js'
-import { fetchOpenLlm } from './openllm.js'
 import type { BenchmarkScore } from './types.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -70,54 +68,22 @@ export async function getBenchmarkScores(
 }
 
 async function fetchLiveScores(): Promise<Record<string, BenchmarkScore> | null> {
-  const results = await Promise.allSettled([
-    fetchLiveBench(),
-    fetchArenaElo(),
-    fetchOpenLlm(),
-  ])
+  // Single live source (LiveBench dated CSVs). Chatbot Arena and Open LLM
+  // Leaderboard endpoints died in 2025-2026 (SPA shells, gated datasets)
+  // and were removed; curated data covers the gap (see D1 notes).
+  const livebench = await fetchLiveBench()
+  if (livebench.size === 0) return null
 
-  const allScores = new Map<string, Map<string, number>>()
-
-  const sourceNames = ['livebench', 'arena_elo', 'open_llm'] as const
-
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i]
-    if (result.status === 'fulfilled') {
-      const sourceMap = result.value
-      for (const [model, score] of sourceMap) {
-        if (!allScores.has(model)) {
-          allScores.set(model, new Map())
-        }
-        allScores.get(model)!.set(sourceNames[i], score)
-      }
-    }
-  }
-
-  if (allScores.size === 0) return null
-
-  // Merge: average scores across sources
   const merged: Record<string, BenchmarkScore> = {}
-
-  for (const [normalizedName, sources] of allScores) {
-    const values = Array.from(sources.values())
-    const avg =
-      values.reduce((sum, v) => sum + v, 0) / values.length
-
-    // Use the highest tier among matched sources
-    const sourceObj: { livebench?: number; arena_elo?: number; open_llm?: number } = {}
-    for (const [source, score] of sources) {
-      sourceObj[source as keyof typeof sourceObj] = score
-    }
-
+  for (const [normalizedName, score] of livebench) {
     merged[normalizedName] = {
       model_id: normalizedName,
-      score: Math.round(avg * 10) / 10,
+      score,
       tier: 'direct',
-      sources: sourceObj,
+      sources: { livebench: score },
       last_updated: new Date().toISOString(),
     }
   }
-
   return merged
 }
 

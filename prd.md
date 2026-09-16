@@ -26,7 +26,7 @@ Users currently guess, ask forums, or rely on outdated blog posts. whollama answ
 ## 3. Goals
 
 - Recommend the best Ollama models for the user's hardware in under 5 seconds
-- Use real, multi-source benchmark scores — not self-reported model card numbers
+- Use real benchmark scores — not self-reported model card numbers
 - Keep every recommendation immediately actionable (`ollama pull <model>`)
 - Work offline via a curated fallback catalog
 - Be scriptable and composable (`--json` output)
@@ -97,14 +97,14 @@ Each catalog entry contains:
 
 ### 6.3 Core — Benchmark Scoring
 
-Scores are merged from multiple public sources:
+Scores come from LiveBench's public dated tables, merged with curated scores
+for full coverage (Chatbot Arena and Open LLM Leaderboard endpoints died in
+2025–2026 and were removed; see `src/benchmarks/`):
 
 | Source | Type | Weight |
 |---|---|---|
 | LiveBench | Direct benchmark | High |
-| Chatbot Arena ELO | Human preference | High |
-| Open LLM Leaderboard v2 | Academic suite | Medium |
-| Curated internal scores | Hardcoded fallback | Low |
+| Curated internal scores | Maintainer-assigned fallback | Low |
 
 Score resolution tiers (descending trust):
 1. `direct` — exact model name match on a leaderboard
