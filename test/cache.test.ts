@@ -95,13 +95,19 @@ describe('catalog cache', () => {
     writeFileSync(catalogFile, '{bad json')
     expect(await readCatalogCache()).toBeNull()
 
-    rmSync(catalogFile, { force: true })
-    await writeCatalogCache(
-      catalogModels().map((model) => ({
-        ...model,
-        name: `${model.family}:latest`,
-      })),
+    const fallbackOnly = catalogModels().map((model) => ({
+      ...model,
+      name: `${model.family}:latest`,
+    }))
+    writeFileSync(
+      catalogFile,
+      JSON.stringify({ timestamp: new Date().toISOString(), models: fallbackOnly }),
     )
+    expect(await readCatalogCache()).toBeNull()
+    expect(await readStaleCatalog()).toBeNull()
+
+    rmSync(catalogFile, { force: true })
+    await writeCatalogCache(fallbackOnly)
     expect(await readCatalogCache()).toBeNull()
   })
 
@@ -135,16 +141,23 @@ describe('benchmark cache', () => {
     writeFileSync(benchmarksFile, '{bad json')
     expect(await readBenchmarkCache()).toBeNull()
 
+    const poisonedScores = benchmarkScores()
+    poisonedScores['model-0'] = {
+      ...poisonedScores['model-0'],
+      score: 1944200,
+    }
+    writeFileSync(
+      benchmarksFile,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        scores: poisonedScores,
+      }),
+    )
+    expect(await readBenchmarkCache()).toBeNull()
+    expect(await readStaleBenchmarks()).toBeNull()
+
     rmSync(benchmarksFile, { force: true })
-    await writeBenchmarkCache({
-      one: {
-        model_id: 'one',
-        score: 1944200,
-        tier: 'direct',
-        sources: {},
-        last_updated: '',
-      },
-    })
+    await writeBenchmarkCache(poisonedScores)
     expect(await readBenchmarkCache()).toBeNull()
   })
 

@@ -337,20 +337,20 @@ async function scrapeCatalogInner(
   const results = await concurrentMap(
     allItems,
     async (item, index) => {
-        if (onProgress) onProgress(index + 1, allItems.length, item.name)
+      if (onProgress) onProgress(index + 1, allItems.length, item.name)
 
-        try {
-          const variants = await scrapeTagVariants(item.name, signal)
-          return modelFromVariants(item, variants)
-        } catch {
-          return modelFromVariants(item, [])
-        }
-      },
-      CONCURRENCY,
-      signal,
-    )
+      try {
+        const variants = await scrapeTagVariants(item.name, signal)
+        return modelFromVariants(item, variants)
+      } catch {
+        return modelFromVariants(item, [])
+      }
+    },
+    CONCURRENCY,
+    signal,
+  )
 
-    if (signal.aborted) return []
+  if (signal.aborted) return []
 
   for (const batch of results) {
     models.push(...batch)
