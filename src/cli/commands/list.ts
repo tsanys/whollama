@@ -53,9 +53,14 @@ export async function listCommand(options: ListOptions): Promise<void> {
     speedCalibrationRatio: calibration?.ratio,
   })
 
+  const dataSources = {
+    catalog: { source: catalog.source, cache: catalog.cache },
+    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+  } as const
+
   if (options.json) {
-    console.log(renderJson(results.slice(0, 100), hardware))
+    console.log(renderJson(results.slice(0, 100), hardware, dataSources))
   } else {
-    renderTable(results.slice(0, 50), hardware, options.task)
+    renderTable(results.slice(0, 50), hardware, options.task, dataSources)
   }
 }

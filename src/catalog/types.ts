@@ -2,6 +2,11 @@ export type ModelTag = 'tools' | 'vision' | 'code' | 'math' | 'embedding' | 'gen
 
 export type CatalogSource = 'live' | 'cache' | 'curated'
 
+export interface CatalogCacheMetadata {
+  freshness: 'fresh' | 'stale'
+  ageMs: number
+}
+
 export type CatalogProgressCallback = (current: number, total: number, modelName: string) => void
 
 export interface OllamaModel {

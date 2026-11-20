@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { readBenchmarkCache, writeBenchmarkCache, readStaleBenchmarks } from './cache.js'
 import { fetchLiveBench } from './livebench.js'
 import type { BenchmarkScore } from './types.js'
+import type { CacheMetadata } from '../utils/storage.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FALLBACK_PATH = path.resolve(__dirname, '../../data/benchmarks.json')
@@ -16,6 +17,7 @@ export interface BenchmarkOptions {
 export interface BenchmarkResult {
   scores: Record<string, BenchmarkScore>
   source: 'cache' | 'live' | 'curated'
+  cache?: CacheMetadata
 }
 
 export const MIN_LIVE_SCORES = 10
@@ -29,7 +31,7 @@ export async function getBenchmarkScores(
   if (!forceRefresh) {
     const cached = await readBenchmarkCache()
     if (cached) {
-      return { scores: cached, source: 'cache' }
+      return { scores: cached.scores, source: 'cache', cache: cached.cache }
     }
   }
 
@@ -59,7 +61,7 @@ export async function getBenchmarkScores(
   // Step 3: Stale cache
   const stale = await readStaleBenchmarks()
   if (stale) {
-    return { scores: stale, source: 'cache' }
+    return { scores: stale.scores, source: 'cache', cache: stale.cache }
   }
 
   // Step 4: Curated fallback

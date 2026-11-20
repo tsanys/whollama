@@ -83,5 +83,8 @@ export async function infoCommand(options: InfoOptions): Promise<void> {
   const displayModel = scoreModel(model, benchmark, hardware)
   displayModel.rank = 1
 
-  console.log(renderModelInfo(displayModel))
+  console.log(renderModelInfo(displayModel, {
+    catalog: { source: catalog.source, cache: catalog.cache },
+    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+  }))
 }

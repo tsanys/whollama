@@ -78,8 +78,9 @@ export function extractPulls(texts: string[]): number {
 
 async function scrapeListPage(
   url: string,
+  signal: AbortSignal,
 ): Promise<ScrapedModelInfo[]> {
-  const response = await safeFetch(url)
+  const response = await safeFetch(url, { signal })
   if (!response || !response.ok) return []
 
   const html = await response.text()
@@ -199,11 +200,14 @@ export function parseTagsPageHtml(modelName: string, html: string): TagVariant[]
   return variants
 }
 
-export async function scrapeTagVariants(modelName: string): Promise<TagVariant[]> {
+export async function scrapeTagVariants(
+  modelName: string,
+  signal?: AbortSignal,
+): Promise<TagVariant[]> {
   const url = `https://ollama.com/library/${modelName}/tags`
   // Ask for JSON: the site serves `{"tags": [...]}` via content negotiation,
   // which is smaller and immune to markup churn. HTML is the fallback.
-  const response = await safeFetch(url, { accept: 'application/json' })
+  const response = await safeFetch(url, { accept: 'application/json', signal })
   if (!response || !response.ok) return []
 
   const text = await response.text()
@@ -267,12 +271,13 @@ async function concurrentMap<T, R>(
   items: T[],
   fn: (item: T, index: number) => Promise<R>,
   concurrency: number,
+  signal: AbortSignal,
 ): Promise<R[]> {
   const results: R[] = []
   let nextIndex = 0
 
   async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
+    while (!signal.aborted && nextIndex < items.length) {
       const i = nextIndex++
       results[i] = await fn(items[i], i)
     }
@@ -286,16 +291,6 @@ async function concurrentMap<T, R>(
 const CONCURRENCY = 5
 const SCRAPE_OVERALL_TIMEOUT_MS = 45_000
 
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms)
-  })
-  return Promise.race([p, timeout]).finally(() => {
-    if (timer) clearTimeout(timer)
-  })
-}
-
 export class HtmlScrapeSource implements CatalogSource {
   name = 'live-html'
   fetch(onProgress?: CatalogProgressCallback): Promise<OllamaModel[]> {
@@ -306,36 +301,56 @@ export class HtmlScrapeSource implements CatalogSource {
 export async function scrapeCatalog(
   onProgress?: CatalogProgressCallback,
 ): Promise<OllamaModel[]> {
-  return withTimeout(scrapeCatalogInner(onProgress), SCRAPE_OVERALL_TIMEOUT_MS, [])
+  const controller = new AbortController()
+  const timer = setTimeout(
+    () => controller.abort(new Error('Catalog scrape timed out')),
+    SCRAPE_OVERALL_TIMEOUT_MS,
+  )
+
+  try {
+    return await scrapeCatalogInner(onProgress, controller.signal)
+  } catch (error) {
+    if (controller.signal.aborted) return []
+    throw error
+  } finally {
+    clearTimeout(timer)
+    if (!controller.signal.aborted) {
+      controller.abort(new Error('Catalog scrape completed'))
+    }
+  }
 }
 
 async function scrapeCatalogInner(
-  onProgress?: CatalogProgressCallback,
+  onProgress: CatalogProgressCallback | undefined,
+  signal: AbortSignal,
 ): Promise<OllamaModel[]> {
   // Single list page: the site ignores `&page=N` (page 2 returns the same
   // 240 models), so extra pages only produce duplicates.
   const baseUrl = 'https://ollama.com/library?sort=popular'
 
-  const allItems = dedupeItems(await scrapeListPage(baseUrl))
+  const allItems = dedupeItems(await scrapeListPage(baseUrl, signal))
 
-  if (allItems.length === 0) return []
+  if (allItems.length === 0 || signal.aborted) return []
 
   const models: OllamaModel[] = []
 
   const results = await concurrentMap(
     allItems,
     async (item, index) => {
-      if (onProgress) onProgress(index + 1, allItems.length, item.name)
+        if (onProgress) onProgress(index + 1, allItems.length, item.name)
 
-      try {
-        const variants = await scrapeTagVariants(item.name)
-        return modelFromVariants(item, variants)
-      } catch {
-        return modelFromVariants(item, [])
-      }
-    },
-    CONCURRENCY,
-  )
+        try {
+          const variants = await scrapeTagVariants(item.name, signal)
+          return modelFromVariants(item, variants)
+        } catch {
+          return modelFromVariants(item, [])
+        }
+      },
+      CONCURRENCY,
+      signal,
+    )
+
+    if (signal.aborted) return []
 
   for (const batch of results) {
     models.push(...batch)

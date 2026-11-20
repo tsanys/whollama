@@ -9,10 +9,15 @@ const TMP = mkdtempSync(join(tmpdir(), 'whollama-utils-test-'))
 process.env.WHOLLAMA_DIR = TMP
 const storage = await import('../src/utils/storage.js')
 
-function okJson(body: unknown, status = 200): Response {
+function okJson(
+  body: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     json: async () => body,
     text: async () => JSON.stringify(body),
   } as Response
@@ -58,6 +63,71 @@ describe('safeFetch', () => {
     const res = await safeFetch('https://example.com/x', { retries: 1 })
     expect(res).not.toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  it('honors Retry-After for 429 responses', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .fn<() => Promise<Response>>()
+      .mockResolvedValueOnce(okJson({}, 429, { 'Retry-After': '2' }))
+      .mockResolvedValueOnce(okJson({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = safeFetch('https://example.com/x', { retries: 1 })
+    await vi.advanceTimersByTimeAsync(1_999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(result).resolves.not.toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+  it('does not retry when Retry-After exceeds the bounded delay', async () => {
+    const fetchMock = vi.fn(async () =>
+      okJson({}, 429, { 'Retry-After': '120' }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await safeFetch('https://example.com/x')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('aborts an in-flight request when its caller signal is aborted', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('aborted', 'AbortError')),
+            { once: true },
+          )
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = safeFetch('https://example.com/x', {
+      retries: 2,
+      signal: controller.signal,
+    })
+    controller.abort()
+
+    await expect(result).resolves.toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('aborts during retry backoff without starting another request', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const fetchMock = vi.fn(async () => okJson({}, 503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = safeFetch('https://example.com/x', {
+      retries: 2,
+      signal: controller.signal,
+    })
+    await Promise.resolve()
+    controller.abort()
+
+    await expect(result).resolves.toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
   })
   it('gives up after retries on persistent throw', async () => {
     const fetchMock = vi.fn(async () => {

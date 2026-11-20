@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ellipsize, tableLayout, renderJson } from '../src/cli/display.js'
+import type { RecommendationDataSources } from '../src/cli/display.js'
 import type { HardwareInfo } from '../src/hardware/types.js'
 import type { ScoredModel } from '../src/scorer/types.js'
 
@@ -73,5 +74,23 @@ describe('renderJson parity', () => {
     // legacy fields intact
     expect(parsed.models[0].name).toBe('qwen3:14b')
     expect(parsed.models[0].pull_command).toBe('ollama pull qwen3:14b')
+  })
+
+  it('reports cache freshness and age as additive data-source metadata', () => {
+    const dataSources: RecommendationDataSources = {
+      catalog: {
+        source: 'cache',
+        cache: { freshness: 'stale', ageMs: 172_800_000 },
+      },
+      benchmarks: { source: 'live' },
+    }
+
+    const parsed = JSON.parse(renderJson([scored()], hw, dataSources))
+    expect(parsed.data_sources.catalog).toEqual({
+      source: 'cache',
+      cache: { freshness: 'stale', age_ms: 172_800_000 },
+    })
+    expect(parsed.data_sources.benchmarks).toEqual({ source: 'live' })
+    expect(parsed.models[0].name).toBe('qwen3:14b')
   })
 })

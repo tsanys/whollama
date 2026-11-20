@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
+import { safeFetch } from '../src/utils/fetch.js'
 import {
   parsePulls,
   parseTags,
@@ -12,7 +13,17 @@ import {
   parseTagsJson,
   dedupeModels,
   dedupeItems,
+  scrapeCatalog,
 } from '../src/catalog/scraper.js'
+
+vi.mock('../src/utils/fetch.js', () => ({ safeFetch: vi.fn() }))
+
+const mockedSafeFetch = vi.mocked(safeFetch)
+
+afterEach(() => {
+  mockedSafeFetch.mockReset()
+  vi.useRealTimers()
+})
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')
@@ -200,5 +211,50 @@ describe('parseCatalogListHtml', () => {
   it('skips /tags links', () => {
     const html = `<ul><li><a href="/library/foo/tags">t</a></li></ul>`
     expect(parseCatalogListHtml(html)).toHaveLength(0)
+  })
+})
+
+describe('scrapeCatalog cancellation', () => {
+  it('aborts active workers at the overall deadline and starts no more requests', async () => {
+    vi.useFakeTimers()
+
+    const listHtml = `<ul>${Array.from(
+      { length: 10 },
+      (_, index) => `<li><a href="/library/model-${index}">model</a></li>`,
+    ).join('')}</ul>`
+    let tagRequests = 0
+    let markWorkersStarted!: () => void
+    const workersStarted = new Promise<void>((resolve) => {
+      markWorkersStarted = resolve
+    })
+
+    mockedSafeFetch.mockImplementation((url, options) => {
+      if (url.endsWith('/library?sort=popular')) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => listHtml,
+        } as Response)
+      }
+
+      tagRequests += 1
+      if (tagRequests === 5) markWorkersStarted()
+      return new Promise((resolve) => {
+        const signal = options?.signal
+        if (signal?.aborted) {
+          resolve(null)
+          return
+        }
+        signal?.addEventListener('abort', () => resolve(null), { once: true })
+      })
+    })
+
+    const result = scrapeCatalog()
+    await workersStarted
+    expect(tagRequests).toBe(5)
+
+    await vi.advanceTimersByTimeAsync(45_000)
+    await expect(result).resolves.toEqual([])
+    expect(tagRequests).toBe(5)
+    expect(mockedSafeFetch.mock.calls[1]?.[1]?.signal?.aborted).toBe(true)
   })
 })

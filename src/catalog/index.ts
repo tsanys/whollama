@@ -1,7 +1,11 @@
 import { readCatalogCache, writeCatalogCache, readStaleCatalog } from './cache.js'
 import { scrapeCatalog } from './scraper.js'
 import { loadCuratedCatalog } from './fallback.js'
-import type { OllamaModel, CatalogProgressCallback } from './types.js'
+import type {
+  OllamaModel,
+  CatalogCacheMetadata,
+  CatalogProgressCallback,
+} from './types.js'
 
 export interface CatalogOptions {
   offline?: boolean
@@ -12,6 +16,7 @@ export interface CatalogOptions {
 export interface CatalogResult {
   models: OllamaModel[]
   source: 'cache' | 'live' | 'curated'
+  cache?: CatalogCacheMetadata
 }
 
 export async function getCatalog(options: CatalogOptions = {}): Promise<CatalogResult> {
@@ -20,7 +25,7 @@ export async function getCatalog(options: CatalogOptions = {}): Promise<CatalogR
   if (!forceRefresh) {
     const cached = await readCatalogCache()
     if (cached) {
-      return { models: cached, source: 'cache' }
+      return { models: cached.models, source: 'cache', cache: cached.cache }
     }
   }
 
@@ -34,7 +39,7 @@ export async function getCatalog(options: CatalogOptions = {}): Promise<CatalogR
 
   const stale = await readStaleCatalog()
   if (stale) {
-    return { models: stale, source: 'cache' }
+    return { models: stale.models, source: 'cache', cache: stale.cache }
   }
 
   const curated = await loadCuratedCatalog()

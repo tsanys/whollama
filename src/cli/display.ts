@@ -2,10 +2,58 @@ import Table from 'cli-table3'
 import chalk from 'chalk'
 import type { HardwareInfo } from '../hardware/types.js'
 import type { ScoredModel } from '../scorer/types.js'
+import type { CacheMetadata } from '../utils/storage.js'
+
+export interface DataSourceStatus {
+  source: 'cache' | 'live' | 'curated'
+  cache?: CacheMetadata
+}
+
+export interface RecommendationDataSources {
+  catalog: DataSourceStatus
+  benchmarks: DataSourceStatus
+}
 
 function termWidth(): number {
   const w = process.stdout.columns
   return typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : 80
+}
+
+function formatCacheAge(ageMs: number): string {
+  const minutes = Math.floor(Math.max(0, ageMs) / 60_000)
+  if (minutes < 1) return 'under 1m'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `${hours}h`
+  return `${Math.floor(hours / 24)}d`
+}
+
+function formatDataSource(name: string, data: DataSourceStatus): string {
+  if (data.source !== 'cache' || !data.cache) {
+    return `${name}: ${data.source}`
+  }
+  return `${name}: ${data.cache.freshness} cache (${formatCacheAge(data.cache.ageMs)} old)`
+}
+
+function formatDataSources(dataSources: RecommendationDataSources): string {
+  return [
+    formatDataSource('catalog', dataSources.catalog),
+    formatDataSource('benchmarks', dataSources.benchmarks),
+  ].join(' · ')
+}
+
+function serializeDataSource(data: DataSourceStatus): Record<string, unknown> {
+  return {
+    source: data.source,
+    ...(data.cache
+      ? {
+          cache: {
+            freshness: data.cache.freshness,
+            age_ms: data.cache.ageMs,
+          },
+        }
+      : {}),
+  }
 }
 
 export function ellipsize(s: string, max: number): string {
@@ -64,9 +112,13 @@ export function renderTable(
   results: ScoredModel[],
   hardware: HardwareInfo,
   task?: string,
+  dataSources?: RecommendationDataSources,
 ): void {
   console.log()
   console.log(renderHardwareBox(hardware))
+  if (dataSources) {
+    console.log(chalk.dim(`  Data: ${formatDataSources(dataSources)}`))
+  }
   console.log()
 
   if (results.length === 0) {
@@ -113,6 +165,7 @@ export function renderTable(
 export function renderJson(
   results: ScoredModel[],
   hardware: HardwareInfo,
+  dataSources?: RecommendationDataSources,
 ): string {
   const output = {
     hardware: {
@@ -131,6 +184,14 @@ export function renderJson(
       disk_free_gb: hardware.disk_free_gb,
       os: hardware.os,
     },
+    ...(dataSources
+      ? {
+          data_sources: {
+            catalog: serializeDataSource(dataSources.catalog),
+            benchmarks: serializeDataSource(dataSources.benchmarks),
+          },
+        }
+      : {}),
     models: results.map((m) => ({
       rank: m.rank,
       name: m.name,
@@ -151,6 +212,7 @@ export function renderJson(
 
 export function renderModelInfo(
   model: ScoredModel,
+  dataSources?: RecommendationDataSources,
 ): string {
   const lines: string[] = []
 
@@ -168,6 +230,9 @@ export function renderModelInfo(
   lines.push(`  Pulls:          ${model.pulls.toLocaleString()}`)
   lines.push(`  Pull command:   ${model.pull_command}`)
   lines.push(`  Source:         ${model.source}`)
+  if (dataSources) {
+    lines.push(`  Data:           ${formatDataSources(dataSources)}`)
+  }
   lines.push()
 
   return lines.join('\n')
