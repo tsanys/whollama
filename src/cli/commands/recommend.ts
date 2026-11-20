@@ -15,6 +15,7 @@ export interface RecommendOptions {
   json?: boolean
   offline?: boolean
   verbose?: boolean
+  explain?: boolean
   gpu?: string
   ram?: number
   vram?: number
@@ -79,7 +80,7 @@ export async function recommendCommand(
   if (options.json) {
     console.log(renderJson(results, hardware, dataSources))
   } else {
-    renderTable(results, hardware, options.task, dataSources)
+    renderTable(results, hardware, options.task, dataSources, options.explain)
   }
 
   return results

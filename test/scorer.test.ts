@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { estimateVramGb, getVramFit } from '../src/scorer/vram.js'
+import { estimateDownloadGb, getDiskFit } from '../src/scorer/download.js'
 import { estimateSpeed } from '../src/scorer/speed.js'
 import { recencyMultiplier } from '../src/scorer/recency.js'
 import { scoreModels } from '../src/scorer/index.js'
@@ -55,6 +56,23 @@ describe('getVramFit', () => {
   })
 })
 
+describe('download size and disk fit estimates', () => {
+  it('estimates weight size from parameter count and known quantization', () => {
+    expect(estimateDownloadGb(14.8, 'Q4_K_M')).toBe(8.33)
+    expect(estimateDownloadGb(8, 'Q8_0')).toBe(8.5)
+    expect(estimateDownloadGb(7, 'unknown')).toBeNull()
+    expect(estimateDownloadGb(0, 'Q4_K_M')).toBeNull()
+  })
+
+  it('distinguishes enough, tight, and insufficient disk space', () => {
+    expect(getDiskFit(8.33, 12)).toBe('fits')
+    expect(getDiskFit(8.33, 9)).toBe('tight')
+    expect(getDiskFit(8.33, 8)).toBe('insufficient')
+    expect(getDiskFit(null, 100)).toBe('unknown')
+    expect(getDiskFit(8.33, null)).toBe('unknown')
+  })
+})
+
 describe('estimateSpeed', () => {
   it('smaller model is faster', () => {
     const fast = estimateSpeed(model({ params_b: 3 }), hw)
@@ -102,6 +120,15 @@ describe('scoreModels curated wiring', () => {
     const [scored] = scoreModels(models, benchmarks, hw, { topN: 5 })
     expect(scored.benchmark_tier).toBe('curated')
     expect(scored.composite_score).toBeGreaterThan(0)
+    expect(scored.estimated_download_gb).toBe(0.56)
+    expect(scored.disk_fit).toBe('fits')
+    expect(scored.benchmark_score).toBe(42.1)
+    expect(
+      scored.score_breakdown.benchmark +
+        scored.score_breakdown.vram_fit +
+        scored.score_breakdown.speed +
+        scored.score_breakdown.recency,
+    ).toBeCloseTo(scored.composite_score, 1)
   })
   it('filters cpu-only unless showAll', () => {
     const big = model({ name: 'huge:405b', vram_required_gb: 500, ram_required_gb: 500 })

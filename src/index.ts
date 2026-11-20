@@ -11,6 +11,7 @@ import { listCommand } from './cli/commands/list.js'
 import { infoCommand } from './cli/commands/info.js'
 import { benchCommand } from './cli/commands/bench.js'
 import { updateCommand } from './cli/commands/update.js'
+import { compareCommand } from './cli/commands/compare.js'
 import { failSpinner } from './cli/spinner.js'
 
 interface PackageJson {
@@ -88,6 +89,7 @@ program
   .option('--top <n>', 'Number of results to show (1-100)', parsePositiveInt, 10)
   .option('--task <type>', 'Filter by task (coding, vision, math, tools, embedding, general)')
   .option('--json', 'Output as JSON')
+  .option('--explain', 'Show how each model score is composed')
   .option('--gpu <spec>', 'Override GPU (e.g. "RTX 4090", "M2 Max")')
   .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
   .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
@@ -98,6 +100,7 @@ program
         top,
         task: validateTask(opts.task),
         json: opts.json,
+        explain: opts.explain,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),
         gpu: opts.gpu,
@@ -128,6 +131,33 @@ program
         model,
         top: Math.min(opts.top ?? 10, 100),
         task: validateTask(opts.task),
+        json: opts.json,
+        offline: program.getOptionValue('offline'),
+        verbose: program.getOptionValue('verbose'),
+        gpu: opts.gpu,
+        ram: validateRamVram(opts.ram, 'ram'),
+        vram: validateRamVram(opts.vram, 'vram'),
+      })
+    } catch (err) {
+      failSpinner('An error occurred')
+      console.error(err)
+      process.exit(1)
+    }
+  })
+
+// compare command
+program
+  .command('compare')
+  .description('Compare two or more catalog models for your hardware')
+  .argument('<models...>', 'Model names to compare')
+  .option('--json', 'Output as JSON')
+  .option('--gpu <spec>', 'Override GPU')
+  .option('--ram <gb>', 'Override RAM in GB', parseOptionalPositiveInt)
+  .option('--vram <gb>', 'Override VRAM in GB', parseOptionalPositiveInt)
+  .action(async (models: string[], opts) => {
+    try {
+      await compareCommand({
+        models,
         json: opts.json,
         offline: program.getOptionValue('offline'),
         verbose: program.getOptionValue('verbose'),

@@ -31,11 +31,15 @@ whollama --top 5          # Show top 5 (1-100)
 whollama --task coding    # Filter by task (coding, vision, math, tools, embedding, general)
 whollama --json           # JSON output for scripting
 whollama --offline        # Force offline mode (bundled catalog + scores)
-whollama --verbose        # Show scoring breakdown
+whollama --explain        # Show the score factors for each recommendation
+whollama --verbose        # Show detailed logs
 whollama --no-color       # Disable colored output
 
 whollama --gpu "RTX 4090" --ram 32   # Simulate hardware (planning)
 whollama --gpu "M2 Max" --vram 32
+
+whollama compare qwen3:14b llama3.2:3b
+whollama compare qwen3:14b llama3.2:3b --offline --json
 
 whollama pull             # Interactive model pull (fuzzy filter)
 whollama pull qwen3:14b   # Pull a specific model
@@ -57,8 +61,12 @@ whollama update           # Force refresh catalog and benchmarks
 - **Live catalog** — scrapes ollama.com/library for the latest models
 - **Live benchmarks** — LiveBench dated tables, merged with a curated snapshot for full coverage
 - **Smart scoring** — composite score factoring benchmark quality, VRAM fit, speed, and recency
+- **Download size estimate** — approximate model weight size from parameter count and quantization
+- **Disk check** — flags whether a model fits available space, is tight, or is too large
+- **Score explanations** — see the exact benchmark, VRAM, speed, and recency contributions
+- **Model comparison** — compare two or more named catalog models, including in offline mode
 - **Offline mode** — bundled fallback catalog and scores work without internet
-- **JSON output** — pipe-friendly for scripts and automation, including catalog and benchmark source/cache freshness
+- **JSON output** — includes size estimates, disk fit, score factors, and source/cache freshness
 - **Zero config** — no API keys, no setup, no accounts
 
 ## How It Works
@@ -78,14 +86,18 @@ whollama update           # Force refresh catalog and benchmarks
 
   Recommended Models (task: general)
 
-  #   Model               Params   Quant     Score   Speed     Tags
-  1   qwen3:14b           14.8B    Q4_K_M    87.4    22 t/s    tools
-  2   gemma4:12b          12.0B    Q4_K_M    84.1    28 t/s    vision
-  3   llama3.2:3b          3.2B    Q8_0      71.2    65 t/s    tools
+  #   Model               Params   Quant    Est. GB    Disk   Score  Speed    Tags
+  1   qwen3:14b           14.0B    Q4_K_M   ~7.9 GB   Fits   87.4   ~22 t/s  tools
+  2   gemma4:12b          12.0B    Q4_K_M   ~6.8 GB   Fits   84.1   ~28 t/s  vision
+  3   llama3.2:3b          3.0B    Q4_K_M   ~1.7 GB   Fits   71.2   ~65 t/s  tools
   ...
 
   Top pick: qwen3:14b  •  Run: ollama pull qwen3:14b
 ```
+
+Download size is an estimate from parameter count and quantization, not an exact registry artifact size. Disk status compares that estimate with free space on the Ollama model volume (`OLLAMA_MODELS`, or the default model directory). `Tight` means the model estimate fits but leaves less than a 1 GB or 10% reserve, whichever is larger. Unknown quantizations or unavailable disk data are shown as unknown rather than guessed.
+
+`--explain` prints each recommendation's weighted score contributions. JSON output always includes the same `score_breakdown` values, plus `benchmark_score`, `estimated_download_gb`, and `disk_fit`. `compare` resolves exact catalog names (case and separators are normalized), ranks the requested models, and reports an error for unknown names.
 
 ## Why whollama?
 
