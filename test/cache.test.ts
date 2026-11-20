@@ -130,6 +130,16 @@ describe('catalog cache', () => {
     )
     expect(await readCatalogCache()).toBeNull()
 
+    const terminalControls = catalogModels().map((model) => ({
+      ...model,
+      quant: 'Q4_K_M\x1B]0;title\x07',
+    }))
+    writeFileSync(
+      catalogFile,
+      JSON.stringify({ timestamp: new Date().toISOString(), models: terminalControls }),
+    )
+    expect(await readCatalogCache()).toBeNull()
+
     rmSync(catalogFile, { force: true })
     await writeCatalogCache(fallbackOnly)
     expect(await readCatalogCache()).toBeNull()

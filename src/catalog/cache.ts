@@ -10,6 +10,7 @@ const CATALOG_FILE = 'catalog.json'
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 export const MIN_CACHED_MODELS = 10
 const MODEL_TAGS = new Set(['tools', 'vision', 'code', 'math', 'embedding', 'general'])
+const SAFE_MODEL_NAME = /^[A-Za-z0-9._:/-]{1,128}$/
 
 function isValidModel(value: unknown): value is OllamaModel {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -25,7 +26,8 @@ function isValidModel(value: unknown): value is OllamaModel {
     !/[\x00-\x1f\x7f-\x9f]/.test(text)
 
   return (
-    safeText(model.name) &&
+    typeof model.name === 'string' &&
+    SAFE_MODEL_NAME.test(model.name) &&
     safeText(model.family) &&
     typeof model.params_b === 'number' &&
     Number.isFinite(model.params_b) &&
@@ -33,6 +35,7 @@ function isValidModel(value: unknown): value is OllamaModel {
     typeof model.quant === 'string' &&
     model.quant.length > 0 &&
     model.quant.length <= 32 &&
+    !/[\x00-\x1f\x7f-\x9f]/.test(model.quant) &&
     typeof model.vram_required_gb === 'number' &&
     Number.isFinite(model.vram_required_gb) &&
     model.vram_required_gb >= 0 &&
