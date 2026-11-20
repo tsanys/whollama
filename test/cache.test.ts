@@ -87,8 +87,22 @@ describe('catalog cache', () => {
     const cached = await readCatalogCache()
     expect(cached?.models).toHaveLength(12)
     expect(cached?.models[0].source).toBe('cache')
+    expect(cached?.models[0].updated_at).toBeNull()
     expect(cached?.cache.freshness).toBe('fresh')
     expect(cached?.cache.ageMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('treats timestamps from pre-fix caches as unknown', async () => {
+    writeFileSync(
+      catalogFile,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        models: catalogModels(),
+      }),
+    )
+
+    const cached = await readCatalogCache()
+    expect(cached?.models.every((model) => model.updated_at === null)).toBe(true)
   })
 
   it('rejects malformed and fallback-only cached data', async () => {
@@ -105,6 +119,16 @@ describe('catalog cache', () => {
     )
     expect(await readCatalogCache()).toBeNull()
     expect(await readStaleCatalog()).toBeNull()
+
+    const malformedModels = catalogModels().map((model) => ({
+      ...model,
+      name: 42,
+    }))
+    writeFileSync(
+      catalogFile,
+      JSON.stringify({ timestamp: new Date().toISOString(), models: malformedModels }),
+    )
+    expect(await readCatalogCache()).toBeNull()
 
     rmSync(catalogFile, { force: true })
     await writeCatalogCache(fallbackOnly)
@@ -155,6 +179,20 @@ describe('benchmark cache', () => {
     )
     expect(await readBenchmarkCache()).toBeNull()
     expect(await readStaleBenchmarks()).toBeNull()
+
+    const malformedScores = benchmarkScores()
+    malformedScores['model-0'] = {
+      ...malformedScores['model-0'],
+      tier: 'unexpected' as BenchmarkScore['tier'],
+    }
+    writeFileSync(
+      benchmarksFile,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        scores: malformedScores,
+      }),
+    )
+    expect(await readBenchmarkCache()).toBeNull()
 
     rmSync(benchmarksFile, { force: true })
     await writeBenchmarkCache(poisonedScores)

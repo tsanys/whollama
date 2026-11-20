@@ -46,6 +46,7 @@ export async function listLocalModels(): Promise<string[]> {
     timeout: 5000,
     retries: 0,
     accept: 'application/json',
+    maxResponseBytes: 8 * 1024 * 1024,
   })
   if (!res) return []
   try {

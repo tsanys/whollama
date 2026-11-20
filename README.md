@@ -97,7 +97,7 @@ whollama update           # Force refresh catalog and benchmarks
 
 Download size is an estimate from parameter count and quantization, not an exact registry artifact size. Disk status compares that estimate with free space on the Ollama model volume (`OLLAMA_MODELS`, or the default model directory). `Tight` means the model estimate fits but leaves less than a 1 GB or 10% reserve, whichever is larger. Unknown quantizations or unavailable disk data are shown as unknown rather than guessed.
 
-`--explain` prints each recommendation's weighted score contributions. JSON output always includes the same `score_breakdown` values, plus `benchmark_score`, `estimated_download_gb`, and `disk_fit`. `compare` resolves exact catalog names (case and separators are normalized), ranks the requested models, and reports an error for unknown names.
+`--explain` prints each recommendation's weighted score contributions. When a model's update date is unavailable, its recency contribution uses a neutral value and the explanation says so. JSON output includes `updated_at` (`null` when unavailable), `score_breakdown`, `benchmark_score`, `estimated_download_gb`, and `disk_fit`. `compare` resolves exact catalog names (case and separators are normalized), ranks the requested models, and reports an error for unknown names.
 
 ## Why whollama?
 

@@ -328,10 +328,13 @@ export function formatScoreExplanation(model: ScoredModel): string {
   const benchmarkLabel = model.benchmark_tier === 'none'
     ? `no benchmark data (${breakdown.benchmark.toFixed(1)}/50)`
     : `${model.benchmark_tier} (${breakdown.benchmark.toFixed(1)}/50)`
+  const recencyLabel = model.updated_at === null
+    ? `unknown date, neutral (${breakdown.recency.toFixed(1)}/10)`
+    : `${breakdown.recency.toFixed(1)}/10`
   return [
     `#${model.rank} ${model.name}: score ${model.composite_score.toFixed(1)}`,
     `  Benchmark ${benchmarkLabel}; VRAM ${model.vram_fit} (${breakdown.vram_fit.toFixed(1)}/25)`,
-    `  Speed ~${model.speed_tps} t/s (${breakdown.speed.toFixed(1)}/15); recency ${breakdown.recency.toFixed(1)}/10`,
+    `  Speed ~${model.speed_tps} t/s (${breakdown.speed.toFixed(1)}/15); recency ${recencyLabel}`,
   ].join('\n')
 }
 
@@ -396,6 +399,7 @@ function renderResultsJson(
       vram_fit: m.vram_fit,
       estimated_download_gb: m.estimated_download_gb,
       disk_fit: m.disk_fit,
+      updated_at: m.updated_at,
       score_breakdown: m.score_breakdown,
       source: m.source,
       pull_command: m.pull_command,

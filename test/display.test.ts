@@ -93,6 +93,7 @@ describe('renderJson parity', () => {
     expect(parsed.models[0].vram_fit).toBe('full')
     expect(parsed.models[0].source).toBe('curated')
     expect(parsed.models[0].benchmark_score).toBe(60)
+    expect(parsed.models[0].updated_at).toEqual(expect.any(String))
     expect(parsed.models[0].estimated_download_gb).toBe(8.33)
     expect(parsed.models[0].disk_fit).toBe('fits')
     expect(parsed.models[0].score_breakdown).toEqual(scored().score_breakdown)
@@ -125,6 +126,13 @@ describe('renderJson parity', () => {
     expect(parsed.models[0].score_breakdown).toEqual(scored().score_breakdown)
     expect(formatScoreExplanation(scored())).toContain('Benchmark direct')
     expect(formatScoreExplanation(scored())).toContain('VRAM full')
+    expect(
+      formatScoreExplanation({
+        ...scored(),
+        updated_at: null,
+        score_breakdown: { ...scored().score_breakdown, recency: 9 },
+      }),
+    ).toContain('recency unknown date, neutral (9.0/10)')
   })
 
   it('prints the estimated download size and disk status in the table', () => {

@@ -27,7 +27,9 @@ describe('data/catalog.json', () => {
       expect(m.tags.length).toBeGreaterThan(0)
       for (const t of m.tags) expect(KNOWN_TAGS.has(t)).toBe(true)
       expect(m.pulls).toBeGreaterThanOrEqual(0)
-      expect(Number.isNaN(Date.parse(m.updated_at))).toBe(false)
+      expect(
+        m.updated_at === null || Number.isFinite(Date.parse(m.updated_at)),
+      ).toBe(true)
     }
   })
   it('vram is consistent with the estimator formula used at runtime', () => {
@@ -37,7 +39,10 @@ describe('data/catalog.json', () => {
     for (const m of catalog) {
       const expected = parseFloat(estimateVramGb(m.params_b, m.quant).toFixed(1));
       const drift = Math.abs(m.vram_required_gb - expected);
-      if (new Date(m.updated_at).getFullYear() >= 2026) {
+      if (
+        m.updated_at !== null &&
+        new Date(m.updated_at).getFullYear() >= 2026
+      ) {
         expect(m.vram_required_gb).toBe(expected);
       } else {
         expect(drift).toBeLessThanOrEqual(Math.max(0.2, expected * 0.015));

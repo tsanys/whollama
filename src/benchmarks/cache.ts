@@ -9,14 +9,42 @@ import type { BenchmarkScore } from './types.js'
 const BENCHMARKS_FILE = 'benchmarks.json'
 const BENCHMARKS_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 export const MIN_CACHED_SCORES = 10
+const SCORE_TIERS = new Set(['direct', 'variant', 'family', 'curated', 'none'])
 
-function isSaneScores(scores: Record<string, BenchmarkScore>): boolean {
+function isSaneScores(scores: unknown): scores is Record<string, BenchmarkScore> {
+  if (typeof scores !== 'object' || scores === null || Array.isArray(scores)) {
+    return false
+  }
   const keys = Object.keys(scores)
   if (keys.length < MIN_CACHED_SCORES) return false
-  // Reject poisoned caches (e.g. downloads/likes ingested as scores >100)
-  for (const entry of Object.values(scores)) {
-    if (typeof entry?.score !== 'number' || !Number.isFinite(entry.score)) return false
-    if (entry.score < 0 || entry.score > 100) return false
+  for (const rawEntry of Object.values(scores)) {
+    if (typeof rawEntry !== 'object' || rawEntry === null || Array.isArray(rawEntry)) {
+      return false
+    }
+    const entry = rawEntry as Record<string, unknown>
+    if (
+      typeof entry.score !== 'number' ||
+      !Number.isFinite(entry.score) ||
+      entry.score < 0 ||
+      entry.score > 100 ||
+      typeof entry.tier !== 'string' ||
+      !SCORE_TIERS.has(entry.tier) ||
+      (entry.model_id !== undefined && typeof entry.model_id !== 'string') ||
+      typeof entry.last_updated !== 'string' ||
+      !Number.isFinite(Date.parse(entry.last_updated)) ||
+      typeof entry.sources !== 'object' ||
+      entry.sources === null ||
+      Array.isArray(entry.sources)
+    ) {
+      return false
+    }
+    if (
+      !Object.values(entry.sources).every(
+        (score) => typeof score === 'number' && Number.isFinite(score),
+      )
+    ) {
+      return false
+    }
   }
   return true
 }

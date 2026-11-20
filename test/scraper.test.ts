@@ -68,6 +68,12 @@ describe('sanitizeScraped', () => {
     expect(sanitizeScraped('\x1B[31mred\x1B[0m model')).toBe('red model')
     expect(sanitizeScraped('a\x00b\x1Fc')).toBe('abc')
   })
+
+  it('strips OSC, DCS, and C1 terminal controls', () => {
+    expect(sanitizeScraped('safe\x1B]0;title\x07 text')).toBe('safe text')
+    expect(sanitizeScraped('safe\x1BPpayload\x1B\\ text')).toBe('safe text')
+    expect(sanitizeScraped('safe\x9D52;clipboard\x9C text')).toBe('safe text')
+  })
 })
 
 describe('parseTagVariant', () => {
@@ -98,6 +104,9 @@ describe('parseTagVariant', () => {
     expect(parseTagVariant('qwen3', 'latest')).toBeNull()
     expect(parseTagVariant('qwen3', 'instruct')).toBeNull()
     expect(parseTagVariant('qwen3', '')).toBeNull()
+  })
+  it('rejects model/tag names that exceed the pull-name limit', () => {
+    expect(parseTagVariant('m'.repeat(64), 't'.repeat(64))).toBeNull()
   })
 })
 
@@ -175,6 +184,7 @@ describe('modelFromVariants', () => {
     expect(m.vram_required_gb).toBeGreaterThan(9)
     expect(m.ram_required_gb).toBeGreaterThan(m.vram_required_gb)
     expect(m.name).toBe('qwen3:8b')
+    expect(m.updated_at).toBeNull()
   })
   it('keeps tag name verbatim (no greedy strip)', () => {
     const item = { name: 'qwen3', description: '', pulls: 0, tags: ['general'] as never[] }
@@ -210,6 +220,10 @@ describe('parseCatalogListHtml', () => {
   })
   it('skips /tags links', () => {
     const html = `<ul><li><a href="/library/foo/tags">t</a></li></ul>`
+    expect(parseCatalogListHtml(html)).toHaveLength(0)
+  })
+  it('skips oversized names from scraped links', () => {
+    const html = `<ul><li><a href="/library/${'m'.repeat(129)}">model</a></li></ul>`
     expect(parseCatalogListHtml(html)).toHaveLength(0)
   })
 })

@@ -103,6 +103,11 @@ describe('recencyMultiplier', () => {
     const old = new Date(Date.now() - 24 * 30 * 24 * 3600 * 1000).toISOString()
     expect(recencyMultiplier(old)).toBe(0.8)
   })
+
+  it('uses a neutral score when the update date is unavailable or invalid', () => {
+    expect(recencyMultiplier(null)).toBe(0.9)
+    expect(recencyMultiplier('not-a-date')).toBe(0.9)
+  })
 })
 
 describe('scoreModels curated wiring', () => {
@@ -129,6 +134,15 @@ describe('scoreModels curated wiring', () => {
         scored.score_breakdown.speed +
         scored.score_breakdown.recency,
     ).toBeCloseTo(scored.composite_score, 1)
+  })
+  it('uses neutral recency points when the model date is missing', () => {
+    const [scored] = scoreModels(
+      [model({ updated_at: null })],
+      {},
+      hw,
+      { topN: 1, showAll: true },
+    )
+    expect(scored.score_breakdown.recency).toBe(9)
   })
   it('filters cpu-only unless showAll', () => {
     const big = model({ name: 'huge:405b', vram_required_gb: 500, ram_required_gb: 500 })
