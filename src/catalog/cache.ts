@@ -1,4 +1,9 @@
-import { readJson, writeJson, getFileAge } from '../utils/storage.js'
+import {
+  readJson,
+  writeJson,
+  getFileAge,
+  type CacheMetadata,
+} from '../utils/storage.js'
 import type { OllamaModel } from './types.js'
 
 const CATALOG_FILE = 'catalog.json'
@@ -20,7 +25,12 @@ interface CachedCatalog {
   models: OllamaModel[]
 }
 
-export async function readCatalogCache(): Promise<OllamaModel[] | null> {
+export interface CatalogCacheRead {
+  models: OllamaModel[]
+  cache: CacheMetadata
+}
+
+export async function readCatalogCache(): Promise<CatalogCacheRead | null> {
   const age = await getFileAge(CATALOG_FILE)
   if (age === null) return null
 
@@ -31,7 +41,10 @@ export async function readCatalogCache(): Promise<OllamaModel[] | null> {
   if (!cached?.models) return null
   if (!isSaneCatalog(cached.models)) return null
 
-  return cached.models.map((m) => ({ ...m, source: 'cache' as const }))
+  return {
+    models: cached.models.map((m) => ({ ...m, source: 'cache' as const })),
+    cache: { freshness: 'fresh', ageMs: Math.max(0, age) },
+  }
 }
 
 export async function writeCatalogCache(models: OllamaModel[]): Promise<void> {
@@ -43,9 +56,18 @@ export async function writeCatalogCache(models: OllamaModel[]): Promise<void> {
   await writeJson(CATALOG_FILE, cached)
 }
 
-export async function readStaleCatalog(): Promise<OllamaModel[] | null> {
+export async function readStaleCatalog(): Promise<CatalogCacheRead | null> {
+  const age = await getFileAge(CATALOG_FILE)
+  if (age === null) return null
+
   const cached = await readJson<CachedCatalog>(CATALOG_FILE)
   if (!cached?.models) return null
   if (!isSaneCatalog(cached.models)) return null
-  return cached.models.map((m) => ({ ...m, source: 'cache' as const }))
+  return {
+    models: cached.models.map((m) => ({ ...m, source: 'cache' as const })),
+    cache: {
+      freshness: age > CATALOG_TTL_MS ? 'stale' : 'fresh',
+      ageMs: Math.max(0, age),
+    },
+  }
 }

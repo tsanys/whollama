@@ -58,7 +58,7 @@ whollama update           # Force refresh catalog and benchmarks
 - **Live benchmarks** — LiveBench dated tables, merged with a curated snapshot for full coverage
 - **Smart scoring** — composite score factoring benchmark quality, VRAM fit, speed, and recency
 - **Offline mode** — bundled fallback catalog and scores work without internet
-- **JSON output** — pipe-friendly for scripts and automation
+- **JSON output** — pipe-friendly for scripts and automation, including catalog and benchmark source/cache freshness
 - **Zero config** — no API keys, no setup, no accounts
 
 ## How It Works
@@ -106,6 +106,8 @@ No network? No problem — whollama ships a bundled catalog and benchmark scores
 | `~/.whollama/benchmarks.json` | 7 days | Merged benchmark scores |
 
 `whollama --offline` skips all network requests and uses the cache (or the bundle on first run). Tiny or corrupt caches are ignored automatically and fall back to the next source.
+
+Recommendation JSON includes a top-level `data_sources` object. Cache entries report whether they are fresh or stale and their age in milliseconds; terminal output shows a compact age.
 
 ## Speed calibration
 

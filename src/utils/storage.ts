@@ -4,6 +4,11 @@ import * as os from 'os'
 
 const DEFAULT_DIR = path.join(os.homedir(), '.whollama')
 
+export interface CacheMetadata {
+  freshness: 'fresh' | 'stale'
+  ageMs: number
+}
+
 function whollamaDir(): string {
   // Overridable for tests so they never touch the real cache dir.
   return process.env.WHOLLAMA_DIR ?? DEFAULT_DIR

@@ -70,11 +70,16 @@ export async function recommendCommand(
   )
   stopSpinner(`${results.length} models scored`)
 
+  const dataSources = {
+    catalog: { source: catalog.source, cache: catalog.cache },
+    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+  } as const
+
   // Step 5: Display
   if (options.json) {
-    console.log(renderJson(results, hardware))
+    console.log(renderJson(results, hardware, dataSources))
   } else {
-    renderTable(results, hardware, options.task)
+    renderTable(results, hardware, options.task, dataSources)
   }
 
   return results
