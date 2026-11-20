@@ -82,7 +82,7 @@ describe('listLocalModels (mocked daemon)', () => {
   function mockTags(body: unknown): void {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: true, status: 200, json: async () => body }) as Response),
+      vi.fn(async () => new Response(JSON.stringify(body))),
     )
   }
   it('lists model names, skips nameless entries', async () => {
@@ -96,7 +96,7 @@ describe('listLocalModels (mocked daemon)', () => {
     expect(await listLocalModels()).toEqual([])
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad') } }) as Response),
+      vi.fn(async () => new Response('invalid json')),
     )
     expect(await listLocalModels()).toEqual([])
   })

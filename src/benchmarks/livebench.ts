@@ -36,12 +36,18 @@ export async function fetchLiveBench(): Promise<Map<string, number>> {
 
 /** Discover available table dates from the site's JS bundle. */
 export async function discoverTableDates(): Promise<string[]> {
-  const index = await safeFetch(`${SITE}/`, { timeout: 10000 })
+  const index = await safeFetch(`${SITE}/`, {
+    timeout: 10000,
+    maxResponseBytes: 1024 * 1024,
+  })
   if (!index || !index.ok) return []
   const html = await index.text()
   const bundle = html.match(/static\/js\/main\.([a-f0-9]+)\.js/)?.[1]
   if (!bundle) return []
-  const js = await safeFetch(`${SITE}/static/js/main.${bundle}.js`, { timeout: 15000 })
+  const js = await safeFetch(`${SITE}/static/js/main.${bundle}.js`, {
+    timeout: 15000,
+    maxResponseBytes: 8 * 1024 * 1024,
+  })
   if (!js || !js.ok) return []
   return parseBundleDates(await js.text())
 }
@@ -57,7 +63,10 @@ export function parseBundleDates(js: string): string[] {
 
 async function fetchTable(date: string): Promise<Map<string, number>> {
   try {
-    const response = await safeFetch(`${SITE}/table_${date}.csv`, { timeout: 15000 })
+    const response = await safeFetch(`${SITE}/table_${date}.csv`, {
+      timeout: 15000,
+      maxResponseBytes: 8 * 1024 * 1024,
+    })
     if (!response || !response.ok) return new Map()
     return parseTableCsv(await response.text())
   } catch {

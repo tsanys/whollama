@@ -18,6 +18,6 @@ export interface OllamaModel {
   ram_required_gb: number
   tags: ModelTag[]
   pulls: number
-  updated_at: string
+  updated_at: string | null
   source: CatalogSource
 }

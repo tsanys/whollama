@@ -15,12 +15,61 @@ interface ScrapedModelInfo {
   tags: ModelTag[]
 }
 
-/** Strip ANSI escapes + control chars from scraped strings (terminal injection hardening). */
+function skipControlString(text: string, start: number): number {
+  let index = start
+  while (index < text.length) {
+    if (text[index] === '\x07' || text[index] === '\x9c') return index
+    if (text[index] === '\x1b' && text[index + 1] === '\\') return index + 1
+    index++
+  }
+  return text.length - 1
+}
+
+function skipCsi(text: string, start: number): number {
+  let index = start
+  while (index < text.length) {
+    const code = text.charCodeAt(index)
+    if (code >= 0x40 && code <= 0x7e) return index
+    index++
+  }
+  return text.length - 1
+}
+
+/** Strip terminal control sequences from untrusted scrape text. */
 export function sanitizeScraped(text: string): string {
-  return text
-    .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .trim()
+  let safe = ''
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index)
+    const next = text.charCodeAt(index + 1)
+
+    if (code === 0x1b) {
+      if (next === 0x5b) {
+        index = skipCsi(text, index + 2)
+      } else if ([0x5d, 0x50, 0x58, 0x5e, 0x5f].includes(next)) {
+        index = skipControlString(text, index + 2)
+      } else {
+        index++
+        while (index < text.length) {
+          const part = text.charCodeAt(index)
+          if (part < 0x20 || part > 0x2f) break
+          index++
+        }
+      }
+      continue
+    }
+    if (code === 0x9b) {
+      index = skipCsi(text, index + 1)
+      continue
+    }
+    if ([0x90, 0x98, 0x9d, 0x9e, 0x9f].includes(code)) {
+      index = skipControlString(text, index + 1)
+      continue
+    }
+
+    if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) continue
+    safe += text[index]
+  }
+  return safe.trim()
 }
 
 export function parsePulls(text: string): number {
@@ -80,7 +129,10 @@ async function scrapeListPage(
   url: string,
   signal: AbortSignal,
 ): Promise<ScrapedModelInfo[]> {
-  const response = await safeFetch(url, { signal })
+  const response = await safeFetch(url, {
+    signal,
+    maxResponseBytes: 2 * 1024 * 1024,
+  })
   if (!response || !response.ok) return []
 
   const html = await response.text()
@@ -124,8 +176,8 @@ export function parseCatalogListHtml(html: string): ScrapedModelInfo[] {
 
     const href = link.getAttribute('href')
     if (!href) continue
-    const name = href.replace('/library/', '').split('?')[0]
-    if (!name || name.includes('/tags')) continue
+    const name = sanitizeScraped(href.replace('/library/', '').split('?')[0])
+    if (!name || name.length > 128 || name.includes('/tags')) continue
 
     const p = li.querySelector('p')
     const description = sanitizeScraped(p?.textContent?.trim() ?? '')
@@ -163,6 +215,12 @@ export interface TagVariant {
  * Ollama's default Q4_K_M.
  */
 export function parseTagVariant(modelName: string, tag: string): TagVariant | null {
+  if (
+    modelName.length === 0 ||
+    modelName.length + tag.length + 1 > 128
+  ) {
+    return null
+  }
   const sizeMatch = tag.match(TAG_SIZE_PATTERN)
   if (!sizeMatch) return null
   let params_b = parseFloat(sizeMatch[1])
@@ -207,7 +265,11 @@ export async function scrapeTagVariants(
   const url = `https://ollama.com/library/${modelName}/tags`
   // Ask for JSON: the site serves `{"tags": [...]}` via content negotiation,
   // which is smaller and immune to markup churn. HTML is the fallback.
-  const response = await safeFetch(url, { accept: 'application/json', signal })
+  const response = await safeFetch(url, {
+    accept: 'application/json',
+    signal,
+    maxResponseBytes: 1024 * 1024,
+  })
   if (!response || !response.ok) return []
 
   const text = await response.text()
@@ -261,7 +323,7 @@ export function modelFromVariants(
       ram_required_gb: parseFloat(ramGb.toFixed(1)),
       tags: item.tags,
       pulls: item.pulls || 0,
-      updated_at: new Date().toISOString(),
+      updated_at: null,
       source: 'live' as const,
     }
   })

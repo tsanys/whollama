@@ -1,7 +1,12 @@
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000
+const UNKNOWN_RECENCY_MULTIPLIER = 0.9
 
-export function recencyMultiplier(updatedAt: string): number {
-  const updated = new Date(updatedAt).getTime()
+export function recencyMultiplier(updatedAt: string | null): number {
+  if (updatedAt === null) return UNKNOWN_RECENCY_MULTIPLIER
+
+  const updated = Date.parse(updatedAt)
+  if (!Number.isFinite(updated)) return UNKNOWN_RECENCY_MULTIPLIER
+
   const now = Date.now()
   const ageMs = now - updated
 

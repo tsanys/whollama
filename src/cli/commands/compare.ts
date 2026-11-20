@@ -91,12 +91,16 @@ export async function compareCommand(options: CompareOptions): Promise<ScoredMod
     verboseLog(`Speed calibration: ${calibration.ratio}x (from bench on ${calibration.model})`)
   }
 
+  const requestedNames = new Set(options.models.map((name) => normalizeModelName(name)))
+  const comparisonCandidates = catalog.models.filter((model) =>
+    requestedNames.has(normalizeModelName(model.name)),
+  )
   const scoredModels = scoreModels(
-    catalog.models,
+    comparisonCandidates,
     benchmarks.scores,
     hardware,
     {
-      topN: Math.max(catalog.models.length, 1),
+      topN: Math.max(comparisonCandidates.length, 1),
       showAll: true,
       speedCalibrationRatio: calibration?.ratio,
     },

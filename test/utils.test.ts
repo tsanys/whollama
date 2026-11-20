@@ -14,13 +14,10 @@ function okJson(
   status = 200,
   headers: Record<string, string> = {},
 ): Response {
-  return {
-    ok: status >= 200 && status < 300,
+  return new Response(JSON.stringify(body), {
     status,
-    headers: new Headers(headers),
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  } as Response
+    headers: { 'content-type': 'application/json', ...headers },
+  })
 }
 
 afterEach(() => {
@@ -37,6 +34,7 @@ describe('safeFetch', () => {
     vi.stubGlobal('fetch', fetchMock)
     const res = await safeFetch('https://example.com/x')
     expect(res).not.toBeNull()
+    await expect(res?.json()).resolves.toEqual({ a: 1 })
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }]
     expect(init.headers['User-Agent']).toBe('whollama')
     expect(init.headers['Accept']).toContain('text/html')
@@ -137,6 +135,37 @@ describe('safeFetch', () => {
     expect(await safeFetch('https://example.com/x', { retries: 0 })).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+  it('rejects a body that exceeds its byte limit while streaming', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('too large'))
+        controller.close()
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body)))
+
+    await expect(
+      safeFetch('https://example.com/x', {
+        maxResponseBytes: 4,
+        retries: 0,
+      }),
+    ).resolves.toBeNull()
+  })
+  it('rejects a response whose declared size exceeds its byte limit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response('small', { headers: { 'content-length': '100' } }),
+      ),
+    )
+
+    await expect(
+      safeFetch('https://example.com/x', {
+        maxResponseBytes: 4,
+        retries: 0,
+      }),
+    ).resolves.toBeNull()
+  })
   it('aborts a hanging request after timeout', async () => {
     // A spec-compliant fetch rejects on abort — the mock must too,
     // otherwise await never settles and the timeout is unobservable.
@@ -177,12 +206,19 @@ describe('storage (isolated tmp dir)', () => {
     expect(await storage.readJson('scalar.json')).toBeNull()
     expect(await storage.readJson('missing.json')).toBeNull()
   })
+  it('readJson rejects files larger than the configured cap', async () => {
+    const { writeFileSync } = await import('fs')
+    writeFileSync(join(TMP, 'large.json'), '{"payload":"12345"}')
+
+    expect(await storage.readJson('large.json', 8)).toBeNull()
+  })
   it('writeJson swallows serialization failures', async () => {
     await expect(storage.writeJson('never.json', undefined)).resolves.toBeUndefined()
     expect(readdirSync(TMP).includes('never.json')).toBe(false)
   })
   it('getFileAge: null when missing, ~0 when just written', async () => {
     expect(await storage.getFileAge('nope.json')).toBeNull()
+    expect(await storage.getFileAge('../outside.json')).toBeNull()
     await storage.writeJson('aged.json', { t: 1 })
     const age = await storage.getFileAge('aged.json')
     expect(typeof age).toBe('number')

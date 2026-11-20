@@ -3,10 +3,12 @@ interface FetchOptions {
   retries?: number
   accept?: string
   signal?: AbortSignal
+  maxResponseBytes?: number
 }
 
 const DEFAULT_TIMEOUT = 10_000
 const DEFAULT_RETRIES = 2
+const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 const RETRY_BASE_DELAY_MS = 1_000
 const MAX_RETRY_DELAY_MS = 30_000
 
@@ -55,13 +57,58 @@ function waitForRetry(ms: number, signal?: AbortSignal): Promise<boolean> {
   })
 }
 
+async function readBoundedBody(
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array<ArrayBuffer> | null> {
+  const contentLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    await response.body?.cancel().catch(() => undefined)
+    return null
+  }
+
+  if (!response.body) return new Uint8Array()
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      totalBytes += value.byteLength
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        return null
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const body = new Uint8Array(new ArrayBuffer(totalBytes))
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return body
+}
+
 export async function safeFetch(
   url: string,
   options: FetchOptions = {},
 ): Promise<Response | null> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT
   const retries = options.retries ?? DEFAULT_RETRIES
+  const maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES
   const accept = options.accept ?? 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8'
+
+  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) {
+    throw new RangeError('maxResponseBytes must be a positive safe integer')
+  }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (options.signal?.aborted) return null
@@ -94,7 +141,16 @@ export async function safeFetch(
         await response.body?.cancel().catch(() => undefined)
         return null
       }
-      return response
+
+      const body = await readBoundedBody(response, maxResponseBytes)
+      if (body === null) return null
+      const headers = new Headers(response.headers)
+      headers.delete('content-length')
+      return new Response(body.byteLength > 0 ? body.buffer : null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      })
     } catch {
       if (options.signal?.aborted || attempt === retries) return null
       const exponentialDelay = Math.min(
