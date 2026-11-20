@@ -15,7 +15,7 @@ export interface HardwareInfo {
   gpu: HardwareGpu
   cpu: HardwareCpu
   ram_gb: number
-  disk_free_gb: number
+  disk_free_gb: number | null
   os: 'darwin' | 'linux' | 'win32'
 }
 

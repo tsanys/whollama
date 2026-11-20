@@ -75,7 +75,7 @@ export async function detectHardware(overrides?: HardwareOverride): Promise<Hard
   ])
 
   const gpu = gpuResult.status === 'fulfilled' ? gpuResult.value : { name: 'CPU', vendor: 'cpu-only' as const, vram_gb: 0, bandwidth_gbps: 50, unified: false }
-  const diskFreeGb = diskResult.status === 'fulfilled' ? diskResult.value : 100
+  const diskFreeGb = diskResult.status === 'fulfilled' ? diskResult.value : null
 
   const cpu = detectCpu()
   const ramGb = overrides?.ram ?? detectRam()

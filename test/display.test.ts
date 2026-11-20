@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { ellipsize, tableLayout, renderJson } from '../src/cli/display.js'
+import { describe, it, expect, vi } from 'vitest'
+import {
+  ellipsize,
+  tableLayout,
+  renderJson,
+  renderComparisonJson,
+  renderComparisonTable,
+  formatScoreExplanation,
+  renderTable,
+  comparisonTableLayout,
+} from '../src/cli/display.js'
 import type { RecommendationDataSources } from '../src/cli/display.js'
 import type { HardwareInfo } from '../src/hardware/types.js'
 import type { ScoredModel } from '../src/scorer/types.js'
@@ -29,6 +38,10 @@ function scored(): ScoredModel {
     speed_tps: 20,
     vram_fit: 'full',
     benchmark_tier: 'direct',
+    benchmark_score: 60,
+    estimated_download_gb: 8.33,
+    disk_fit: 'fits',
+    score_breakdown: { benchmark: 30, vram_fit: 25, speed: 3, recency: 9.1 },
     pull_command: 'ollama pull qwen3:14b',
   }
 }
@@ -45,21 +58,29 @@ describe('ellipsize', () => {
 })
 
 describe('tableLayout', () => {
-  it('wide terminal keeps classic 7-column layout', () => {
+  it('wide terminal keeps tags and shows size and disk columns', () => {
     const l = tableLayout(120)
-    expect(l.head).toHaveLength(7)
+    expect(l.head).toHaveLength(9)
     expect(l.showTags).toBe(true)
-    expect(l.colWidths).toEqual([4, 30, 8, 8, 7, 12, 25])
+    expect(l.head).toContain('Est. GB')
+    expect(l.head).toContain('Disk')
+    expect(l.colWidths).toHaveLength(9)
   })
-  it('medium terminal shrinks model/tags columns', () => {
+  it('medium terminal hides tags and speed before the size and disk columns', () => {
     const l = tableLayout(90)
     expect(l.head).toHaveLength(7)
-    expect(l.modelWidth).toBeLessThan(30)
+    expect(l.showTags).toBe(false)
+    expect(l.head).toContain('Est. GB')
+    expect(l.head).toContain('Disk')
+    expect(l.showSpeed).toBe(false)
   })
-  it('narrow terminal (<80) hides Tags column', () => {
+  it('narrow terminal prioritizes download size and disk status', () => {
     const l = tableLayout(70)
     expect(l.head).toHaveLength(6)
     expect(l.showTags).toBe(false)
+    expect(l.showQuant).toBe(false)
+    expect(l.head).toContain('Est. GB')
+    expect(l.head).toContain('Disk')
     expect(l.head).not.toContain('Tags')
   })
 })
@@ -71,6 +92,10 @@ describe('renderJson parity', () => {
     expect(parsed.hardware.os).toBe('darwin')
     expect(parsed.models[0].vram_fit).toBe('full')
     expect(parsed.models[0].source).toBe('curated')
+    expect(parsed.models[0].benchmark_score).toBe(60)
+    expect(parsed.models[0].estimated_download_gb).toBe(8.33)
+    expect(parsed.models[0].disk_fit).toBe('fits')
+    expect(parsed.models[0].score_breakdown).toEqual(scored().score_breakdown)
     // legacy fields intact
     expect(parsed.models[0].name).toBe('qwen3:14b')
     expect(parsed.models[0].pull_command).toBe('ollama pull qwen3:14b')
@@ -92,5 +117,57 @@ describe('renderJson parity', () => {
     })
     expect(parsed.data_sources.benchmarks).toEqual({ source: 'live' })
     expect(parsed.models[0].name).toBe('qwen3:14b')
+  })
+
+  it('marks comparison output and explains the score factors', () => {
+    const parsed = JSON.parse(renderComparisonJson([scored()], hw))
+    expect(parsed.command).toBe('compare')
+    expect(parsed.models[0].score_breakdown).toEqual(scored().score_breakdown)
+    expect(formatScoreExplanation(scored())).toContain('Benchmark direct')
+    expect(formatScoreExplanation(scored())).toContain('VRAM full')
+  })
+
+  it('prints the estimated download size and disk status in the table', () => {
+    const lines: string[] = []
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      lines.push(args.join(' '))
+    })
+    try {
+      renderTable([scored()], hw)
+      expect(lines.join('\n')).toContain('~8.3 GB')
+      expect(lines.join('\n')).toContain('Fits')
+      lines.length = 0
+      renderTable([{ ...scored(), disk_fit: 'insufficient' }], hw)
+      expect(lines.join('\n')).toContain('Not enough')
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it('keeps benchmark and hardware fit visible in comparison layouts', () => {
+    const narrow = comparisonTableLayout(80)
+    expect(narrow.head).toContain('Bench')
+    expect(narrow.head).toContain('VRAM fit')
+    expect(narrow.head).toContain('Est. GB')
+    expect(narrow.head).toContain('Disk')
+
+    const lines: string[] = []
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      lines.push(args.join(' '))
+    })
+    try {
+      renderComparisonTable([
+        scored(),
+        { ...scored(), name: 'llama3.2:3b', rank: 2 },
+      ], hw)
+      expect(lines.join('\n')).toContain('Model Comparison')
+      expect(lines.join('\n')).toContain('qwen3:14b')
+      expect(lines.join('\n')).toContain('llama3.2:3b')
+      expect(lines.join('\n')).toContain('60.0')
+      expect(lines.join('\n')).toContain('full')
+      expect(lines.join('\n')).toContain('~8.3 GB')
+    } finally {
+      log.mockRestore()
+    }
   })
 })

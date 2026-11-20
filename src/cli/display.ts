@@ -14,6 +14,24 @@ export interface RecommendationDataSources {
   benchmarks: DataSourceStatus
 }
 
+interface TableLayout {
+  head: string[]
+  colWidths: number[]
+  showTags: boolean
+  showQuant: boolean
+  showSpeed: boolean
+  modelWidth: number
+  tagsWidth: number
+}
+
+interface ComparisonTableLayout {
+  head: string[]
+  colWidths: number[]
+  modelWidth: number
+  showParams: boolean
+  showSpeed: boolean
+}
+
 function termWidth(): number {
   const w = process.stdout.columns
   return typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : 80
@@ -66,12 +84,13 @@ export function ellipsize(s: string, max: number): string {
 function renderHardwareBox(hardware: HardwareInfo, width = termWidth()): string {
   const { gpu, cpu, ram_gb, disk_free_gb } = hardware
   const gpuLine = gpu.unified
-    ? `GPU: ${gpu.name} — ${gpu.vram_gb} GB unified  BW: ${gpu.bandwidth_gbps} GB/s`
+    ? `GPU: ${gpu.name} | ${gpu.vram_gb} GB unified  BW: ${gpu.bandwidth_gbps} GB/s`
     : gpu.vendor === 'cpu-only'
-      ? `CPU: ${cpu.model} (${cpu.cores} cores) — No GPU detected`
-      : `GPU: ${gpu.name} — ${gpu.vram_gb} GB VRAM  BW: ${gpu.bandwidth_gbps} GB/s`
+      ? `CPU: ${cpu.model} (${cpu.cores} cores) | No GPU detected`
+      : `GPU: ${gpu.name} | ${gpu.vram_gb} GB VRAM  BW: ${gpu.bandwidth_gbps} GB/s`
 
-  const ramLine = `RAM: ${ram_gb} GB  •  Disk: ${disk_free_gb} GB free`
+  const diskLabel = disk_free_gb === null ? 'unavailable' : `${disk_free_gb} GB free`
+  const ramLine = `RAM: ${ram_gb} GB  •  Disk: ${diskLabel}`
 
   // Clamp to terminal width so long GPU names don't overflow narrow terminals
   const maxBox = Math.max(40, Math.min(width, 100))
@@ -86,26 +105,42 @@ function renderHardwareBox(hardware: HardwareInfo, width = termWidth()): string 
   return chalk.blue(`${top}\n${gpuPadded}\n${ramPadded}\n${bottom}`)
 }
 
-interface TableLayout {
-  head: string[]
-  colWidths: number[]
-  showTags: boolean
-  modelWidth: number
-  tagsWidth: number
-}
-
 export function tableLayout(width = termWidth()): TableLayout {
-  // Fixed columns: # (4) Params (8) Quant (8) Score (7) Speed (12) = 39 + ~8 border chars
-  if (width < 80) {
-    const modelWidth = Math.max(12, width - 39 - 8 - 2)
-    return { head: ['#', 'Model', 'Params', 'Quant', 'Score', 'Speed'], colWidths: [4, modelWidth, 8, 8, 7, 12], showTags: false, modelWidth, tagsWidth: 0 }
+  if (width < 90) {
+    const modelWidth = Math.max(12, width - 52)
+    return {
+      head: ['#', 'Model', 'Params', 'Est. GB', 'Disk', 'Score'],
+      colWidths: [4, modelWidth, 8, 9, 12, 7],
+      showTags: false,
+      showQuant: false,
+      showSpeed: false,
+      modelWidth,
+      tagsWidth: 0,
+    }
   }
-  if (width < 100) {
-    const tagsWidth = 14
-    const modelWidth = Math.max(14, width - 39 - tagsWidth - 8 - 2)
-    return { head: ['#', 'Model', 'Params', 'Quant', 'Score', 'Speed', 'Tags'], colWidths: [4, modelWidth, 8, 8, 7, 12, tagsWidth], showTags: true, modelWidth, tagsWidth }
+  if (width < 120) {
+    const modelWidth = Math.max(14, width - 62)
+    return {
+      head: ['#', 'Model', 'Params', 'Quant', 'Est. GB', 'Disk', 'Score'],
+      colWidths: [4, modelWidth, 8, 8, 9, 12, 7],
+      showTags: false,
+      showQuant: true,
+      showSpeed: false,
+      modelWidth,
+      tagsWidth: 0,
+    }
   }
-  return { head: ['#', 'Model', 'Params', 'Quant', 'Score', 'Speed', 'Tags'], colWidths: [4, 30, 8, 8, 7, 12, 25], showTags: true, modelWidth: 30, tagsWidth: 25 }
+  const modelWidth = Math.max(16, Math.min(30, width - 96))
+  const tagsWidth = 18
+  return {
+    head: ['#', 'Model', 'Params', 'Quant', 'Est. GB', 'Disk', 'Score', 'Speed', 'Tags'],
+    colWidths: [4, modelWidth, 8, 8, 9, 12, 7, 12, tagsWidth],
+    showTags: true,
+    showQuant: true,
+    showSpeed: true,
+    modelWidth,
+    tagsWidth,
+  }
 }
 
 export function renderTable(
@@ -113,6 +148,105 @@ export function renderTable(
   hardware: HardwareInfo,
   task?: string,
   dataSources?: RecommendationDataSources,
+  explain = false,
+): void {
+  renderResultsTable(
+    results,
+    hardware,
+    `Recommended Models${task ? ` (task: ${task})` : ''}`,
+    dataSources,
+    explain,
+    true,
+  )
+}
+
+export function renderComparisonTable(
+  results: ScoredModel[],
+  hardware: HardwareInfo,
+  dataSources?: RecommendationDataSources,
+): void {
+  console.log()
+  console.log(renderHardwareBox(hardware))
+  if (dataSources) {
+    console.log(chalk.dim(`  Data: ${formatDataSources(dataSources)}`))
+  }
+  console.log()
+
+  if (results.length === 0) {
+    console.log(chalk.yellow('  No models to compare.'))
+    console.log()
+    return
+  }
+
+  console.log(chalk.bold('  Model Comparison (ranked by score)'))
+  console.log()
+
+  const layout = comparisonTableLayout()
+  const table = new Table({
+    head: layout.head,
+    colWidths: layout.colWidths,
+    style: { head: ['cyan'], border: ['gray'] },
+  })
+
+  for (const model of results) {
+    const benchmark = model.benchmark_score === null
+      ? 'n/a'
+      : model.benchmark_score.toFixed(1)
+    const row = [model.rank.toString(), ellipsize(model.name, layout.modelWidth)]
+    if (layout.showParams) row.push(`${model.params_b.toFixed(1)}B`)
+    row.push(
+      benchmark,
+      model.vram_fit,
+      formatDownloadEstimate(model.estimated_download_gb),
+      formatDiskFit(model.disk_fit),
+      model.composite_score.toFixed(1),
+    )
+    if (layout.showSpeed) row.push(`~${model.speed_tps} t/s`)
+    table.push(row)
+  }
+
+  console.log(table.toString())
+  console.log()
+}
+
+export function comparisonTableLayout(width = termWidth()): ComparisonTableLayout {
+  if (width < 90) {
+    const modelWidth = Math.max(10, width - 64)
+    return {
+      head: ['#', 'Model', 'Bench', 'VRAM fit', 'Est. GB', 'Disk', 'Score'],
+      colWidths: [4, modelWidth, 8, 10, 9, 12, 7],
+      modelWidth,
+      showParams: false,
+      showSpeed: false,
+    }
+  }
+  if (width < 110) {
+    const modelWidth = Math.max(10, width - 74)
+    return {
+      head: ['#', 'Model', 'Params', 'Bench', 'VRAM fit', 'Est. GB', 'Disk', 'Score'],
+      colWidths: [4, modelWidth, 8, 8, 10, 9, 12, 7],
+      modelWidth,
+      showParams: true,
+      showSpeed: false,
+    }
+  }
+  const modelWidth = Math.max(14, Math.min(30, width - 89))
+  return {
+    head: ['#', 'Model', 'Params', 'Bench', 'VRAM fit', 'Est. GB', 'Disk', 'Score', 'Speed'],
+    colWidths: [4, modelWidth, 8, 8, 10, 9, 12, 7, 12],
+    modelWidth,
+    showParams: true,
+    showSpeed: true,
+  }
+}
+
+function renderResultsTable(
+  results: ScoredModel[],
+  hardware: HardwareInfo,
+  heading: string,
+  dataSources: RecommendationDataSources | undefined,
+  explain: boolean,
+  showTopPick: boolean,
 ): void {
   console.log()
   console.log(renderHardwareBox(hardware))
@@ -128,7 +262,7 @@ export function renderTable(
     return
   }
 
-  console.log(chalk.bold(`  Recommended Models${task ? ` (task: ${task})` : ''}`))
+  console.log(chalk.bold(`  ${heading}`))
   console.log()
 
   const layout = tableLayout()
@@ -144,10 +278,12 @@ export function renderTable(
       m.rank.toString(),
       ellipsize(m.name + vramWarning, layout.modelWidth),
       `${m.params_b.toFixed(1)}B`,
-      m.quant,
-      m.composite_score.toFixed(1),
-      `~${m.speed_tps} t/s`,
     ]
+    if (layout.showQuant) row.push(m.quant)
+    row.push(formatDownloadEstimate(m.estimated_download_gb))
+    row.push(formatDiskFit(m.disk_fit))
+    row.push(m.composite_score.toFixed(1))
+    if (layout.showSpeed) row.push(`~${m.speed_tps} t/s`)
     if (layout.showTags) {
       row.push(ellipsize(m.tags.slice(0, 3).join(', '), layout.tagsWidth))
     }
@@ -156,10 +292,47 @@ export function renderTable(
 
   console.log(table.toString())
   console.log()
-  console.log(
-    `  ${chalk.green('Top pick:')} ${results[0]?.name ?? 'N/A'}  •  ${chalk.dim(`Run: ${results[0]?.pull_command ?? ''}`)}`,
-  )
-  console.log()
+  if (explain) {
+    for (const model of results) {
+      console.log(`  ${formatScoreExplanation(model)}`)
+    }
+    console.log()
+  }
+  if (showTopPick) {
+    console.log(
+      `  ${chalk.green('Top pick:')} ${results[0]?.name ?? 'N/A'}  •  ${chalk.dim(`Run: ${results[0]?.pull_command ?? ''}`)}`,
+    )
+    console.log()
+  }
+}
+
+function formatDownloadEstimate(estimatedDownloadGb: number | null): string {
+  return estimatedDownloadGb === null ? 'n/a' : `~${estimatedDownloadGb.toFixed(1)} GB`
+}
+
+function formatDiskFit(diskFit: ScoredModel['disk_fit']): string {
+  switch (diskFit) {
+    case 'fits':
+      return chalk.green('Fits')
+    case 'tight':
+      return chalk.yellow('Tight')
+    case 'insufficient':
+      return chalk.red('Not enough')
+    default:
+      return 'Unknown'
+  }
+}
+
+export function formatScoreExplanation(model: ScoredModel): string {
+  const breakdown = model.score_breakdown
+  const benchmarkLabel = model.benchmark_tier === 'none'
+    ? `no benchmark data (${breakdown.benchmark.toFixed(1)}/50)`
+    : `${model.benchmark_tier} (${breakdown.benchmark.toFixed(1)}/50)`
+  return [
+    `#${model.rank} ${model.name}: score ${model.composite_score.toFixed(1)}`,
+    `  Benchmark ${benchmarkLabel}; VRAM ${model.vram_fit} (${breakdown.vram_fit.toFixed(1)}/25)`,
+    `  Speed ~${model.speed_tps} t/s (${breakdown.speed.toFixed(1)}/15); recency ${breakdown.recency.toFixed(1)}/10`,
+  ].join('\n')
 }
 
 export function renderJson(
@@ -167,7 +340,25 @@ export function renderJson(
   hardware: HardwareInfo,
   dataSources?: RecommendationDataSources,
 ): string {
+  return renderResultsJson(results, hardware, dataSources)
+}
+
+export function renderComparisonJson(
+  results: ScoredModel[],
+  hardware: HardwareInfo,
+  dataSources?: RecommendationDataSources,
+): string {
+  return renderResultsJson(results, hardware, dataSources, 'compare')
+}
+
+function renderResultsJson(
+  results: ScoredModel[],
+  hardware: HardwareInfo,
+  dataSources?: RecommendationDataSources,
+  command?: 'compare',
+): string {
   const output = {
+    ...(command ? { command } : {}),
     hardware: {
       gpu: {
         name: hardware.gpu.name,
@@ -201,7 +392,11 @@ export function renderJson(
       speed_tps: m.speed_tps,
       tags: m.tags,
       benchmark_tier: m.benchmark_tier,
+      benchmark_score: m.benchmark_score,
       vram_fit: m.vram_fit,
+      estimated_download_gb: m.estimated_download_gb,
+      disk_fit: m.disk_fit,
+      score_breakdown: m.score_breakdown,
       source: m.source,
       pull_command: m.pull_command,
     })),

@@ -3,6 +3,7 @@ import type { OllamaModel } from '../catalog/types.js'
 import type { BenchmarkScore } from '../benchmarks/types.js'
 import { getVramFit } from './vram.js'
 import type { VramFit } from './vram.js'
+import { estimateDownloadGb, getDiskFit } from './download.js'
 import { estimateSpeed } from './speed.js'
 import { recencyMultiplier } from './recency.js'
 import type { ScoredModel } from './types.js'
@@ -49,6 +50,13 @@ export function scoreModel(
     vramScore * 25 +
     speedNorm * 15 +
     recency * 10
+  const scoreBreakdown = {
+    benchmark: Math.round(benchmarkQuality * 50 * 100) / 100,
+    vram_fit: Math.round(vramScore * 25 * 100) / 100,
+    speed: Math.round(speedNorm * 15 * 100) / 100,
+    recency: Math.round(recency * 10 * 100) / 100,
+  }
+  const estimatedDownloadGb = estimateDownloadGb(model.params_b, model.quant)
 
   return {
     ...model,
@@ -56,6 +64,10 @@ export function scoreModel(
     composite_score: Math.round(compositeScore * 10) / 10,
     speed_tps: speedEstimate,
     vram_fit: vramFit,
+    estimated_download_gb: estimatedDownloadGb,
+    disk_fit: getDiskFit(estimatedDownloadGb, hardware.disk_free_gb),
+    benchmark_score: benchmark?.score ?? null,
+    score_breakdown: scoreBreakdown,
     benchmark_tier: benchmark?.tier ?? 'none',
     pull_command: `ollama pull ${model.name}`,
   } as ScoredModel
