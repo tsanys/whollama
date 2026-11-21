@@ -1,0 +1,14 @@
+{
+  "Long Agentic": ["long_agentic"],
+  "Reasoning": ["reasoning"],
+  "Coding": ["coding"],
+  "Browser": ["browser"],
+  "Data Analysis": ["data_analysis"],
+  "Research": ["research"],
+  "Design": ["design"],
+  "_overall_weights": {
+    "Long Agentic": 2,
+    "Coding": 1.5,
+    "Design": 1.5
+  }
+}

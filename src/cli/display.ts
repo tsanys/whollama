@@ -3,10 +3,16 @@ import chalk from 'chalk'
 import type { HardwareInfo } from '../hardware/types.js'
 import type { ScoredModel } from '../scorer/types.js'
 import type { CacheMetadata } from '../utils/storage.js'
+import type {
+  BenchmarkRefreshStatus,
+  BenchmarkSnapshotMetadata,
+} from '../benchmarks/types.js'
 
 export interface DataSourceStatus {
   source: 'cache' | 'live' | 'curated'
   cache?: CacheMetadata
+  refresh?: BenchmarkRefreshStatus
+  snapshot?: BenchmarkSnapshotMetadata
 }
 
 export interface RecommendationDataSources {
@@ -47,17 +53,50 @@ function formatCacheAge(ageMs: number): string {
 }
 
 function formatDataSource(name: string, data: DataSourceStatus): string {
-  if (data.source !== 'cache' || !data.cache) {
-    return `${name}: ${data.source}`
-  }
-  return `${name}: ${data.cache.freshness} cache (${formatCacheAge(data.cache.ageMs)} old)`
+  const base = data.source !== 'cache' || !data.cache
+    ? `${name}: ${data.source}`
+    : `${name}: ${data.cache.freshness} cache (${formatCacheAge(data.cache.ageMs)} old)`
+  if (name !== 'benchmarks' || !data.refresh) return base
+  return `${base} · ${formatRefreshStatus(data.refresh)}`
 }
 
-function formatDataSources(dataSources: RecommendationDataSources): string {
-  return [
-    formatDataSource('catalog', dataSources.catalog),
-    formatDataSource('benchmarks', dataSources.benchmarks),
-  ].join(' · ')
+function formatRefreshStatus(refresh: BenchmarkRefreshStatus): string {
+  if (refresh.state === 'success') {
+    const date = refresh.data_date ?? refresh.latest_release_date
+    return `LiveBench ${date ?? 'updated'} (${refresh.model_count} models)`
+  }
+  const detail = refresh.reason
+    ? refresh.reason.replaceAll('-', ' ')
+    : refresh.state
+  if (refresh.state === 'skipped') return `LiveBench refresh skipped (${detail})`
+  const status = refresh.http_status ? `, HTTP ${refresh.http_status}` : ''
+  const release = refresh.latest_release_date
+    ? `, release ${refresh.latest_release_date}`
+    : ''
+  return `LiveBench refresh failed (${detail}${status}${release})`
+}
+
+function serializeRefresh(refresh: BenchmarkRefreshStatus): Record<string, unknown> {
+  return {
+    source: refresh.source,
+    state: refresh.state,
+    url: refresh.url,
+    row_count: refresh.row_count,
+    model_count: refresh.model_count,
+    ...(refresh.latest_release_date
+      ? { latest_release_date: refresh.latest_release_date }
+      : {}),
+    ...(refresh.data_date ? { data_date: refresh.data_date } : {}),
+    ...(refresh.fetched_at ? { fetched_at: refresh.fetched_at } : {}),
+    ...(refresh.reason ? { reason: refresh.reason } : {}),
+    ...(refresh.http_status ? { http_status: refresh.http_status } : {}),
+    ...(refresh.aggregation_method
+      ? { aggregation_method: refresh.aggregation_method }
+      : {}),
+    ...(refresh.suite_weights
+      ? { suite_weights: refresh.suite_weights }
+      : {}),
+  }
 }
 
 function serializeDataSource(data: DataSourceStatus): Record<string, unknown> {
@@ -71,7 +110,16 @@ function serializeDataSource(data: DataSourceStatus): Record<string, unknown> {
           },
         }
       : {}),
+    ...(data.refresh ? { last_refresh: serializeRefresh(data.refresh) } : {}),
+    ...(data.snapshot ? { snapshot: data.snapshot } : {}),
   }
+}
+
+function formatDataSources(dataSources: RecommendationDataSources): string {
+  return [
+    formatDataSource('catalog', dataSources.catalog),
+    formatDataSource('benchmarks', dataSources.benchmarks),
+  ].join(' · ')
 }
 
 export function ellipsize(s: string, max: number): string {

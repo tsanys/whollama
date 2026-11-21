@@ -37,11 +37,11 @@ whollama/
 │   │   └── types.ts           # OllamaModel interface
 │   ├── benchmarks/
 │   │   ├── index.ts           # Exports getBenchmarkScores()
-│   │   ├── livebench.ts       # Fetch/parse LiveBench dated CSV tables
-│   │   │                      # (Arena/OpenLLM endpoints died 2025-2026, removed)
+│   │   ├── livebench.ts       # Discover releases and parse LiveBench 2.0 tables
+│   │   ├── normalize.ts       # Preserve LiveBench as primary; mark legacy scores
 │   │   ├── resolver.ts        # Match model names → scores (fuzzy)
 │   │   ├── cache.ts           # Read/write ~/.whollama/benchmarks.json
-│   │   └── types.ts           # BenchmarkScore, ScoreTier interfaces
+│   │   └── types.ts           # Scores, refresh status, and provenance interfaces
 │   ├── scorer/
 │   │   ├── index.ts           # Exports scoreModels()
 │   │   ├── vram.ts            # VRAM fit estimation
@@ -50,7 +50,7 @@ whollama/
 │   │   └── composite.ts       # Final composite score formula
 │   └── utils/
 │       ├── storage.ts         # ~/.whollama/ path helpers, read/write JSON
-│       ├── fetch.ts           # Fetch with timeout + retry
+│       ├── fetch.ts           # Bounded fetch with timeout, retry, and failure status
 │       └── logger.ts          # Verbose logging utility
 ├── data/
 │   ├── catalog.json           # Bundled curated catalog (~50 models)
@@ -94,9 +94,10 @@ whollama (CLI invoked)
         │         └── fallback: load data/catalog.json (bundled)
         │
         ├──► getBenchmarkScores()
-        │         ├── try: fetch LiveBench dated CSVs (newer tables win)
-        │         │         └── on success: merge curated gap-fill, write cache
-        │         ├── fallback: read ~/.whollama/benchmarks.json
+        │         ├── try: fetch latest LiveBench 2.0 release table + categories
+        │         │         └── validate coverage, preserve source date, merge curated gap-fill, write cache
+        │         ├── on failure: report safe reason and use stale cache if available
+        │         ├── fallback: read ~/.whollama/benchmarks.json (fresh or stale)
         │         └── fallback: load data/benchmarks.json (bundled)
         │
         ├──► scoreModels(catalog, benchmarks, hardware, filters)
@@ -114,6 +115,13 @@ whollama (CLI invoked)
                   ├── --json: JSON.stringify to stdout
                   └── default: render table via cli-table3
 ```
+
+LiveBench is the only active online benchmark source. The scorer keeps its
+weighted release score separate from Arena Elo and other benchmark metrics.
+The cache migration retains historical entries with no primary-source value as
+lower-confidence fallbacks and marks them `legacy-unverified`. Maintainers have
+not regenerated the bundled benchmark JSON because redistribution terms and a
+uniform snapshot date are not verified.
 
 ---
 

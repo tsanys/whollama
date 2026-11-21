@@ -108,7 +108,12 @@ export async function compareCommand(options: CompareOptions): Promise<ScoredMod
   const results = resolveComparedModels(scoredModels, options.models)
   const dataSources: RecommendationDataSources = {
     catalog: { source: catalog.source, cache: catalog.cache },
-    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+    benchmarks: {
+      source: benchmarks.source,
+      cache: benchmarks.cache,
+      refresh: benchmarks.refresh,
+      snapshot: benchmarks.snapshot,
+    },
   }
 
   if (options.json) {

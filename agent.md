@@ -162,18 +162,23 @@ For individual model tags (quantizations), fetch `https://ollama.com/library/<na
 ## Benchmark Score Notes
 
 ### LiveBench
-- URL: `https://livebench.ai/` (check for public JSON data endpoint)
-- Scores are task-specific — average them for a single composite
-- Normalize to 0–100 against the known range
+- Discover release IDs from the current site bundle; v2 tables are under
+  `https://livebench.ai/data/{release}/table.csv` with release-specific
+  `categories.json`.
+- Use the published overall suite weights. Do not combine LiveBench with Arena
+  Elo or other unlike raw metrics.
+- Preserve the release date separately from local fetch/cache timestamps.
+- Do not add fetched values to the bundled dataset until redistribution terms
+  are verified.
 
 ### Chatbot Arena ELO
-- URL: Check `https://lmarena.ai/` or HuggingFace datasets for latest ELO dump
-- ELO range is roughly 800–1400 for current models
-- Normalize: `(elo - 800) / (1400 - 800) × 100`
+- Not an active source. Re-verify availability, stable access, data dates, and
+  redistribution terms before enabling it. Never average raw Elo with other
+  benchmark scores.
 
 ### Open LLM Leaderboard v2
-- URL: HuggingFace datasets API — `open-llm-leaderboard/results`
-- Take the average score across all benchmarks in the suite
+- Not an active source. Re-verify the current dataset contract, suite dates,
+  score comparability, and redistribution terms before enabling it.
 
 ### Score Resolution
 Model names on leaderboards use different conventions than Ollama names.

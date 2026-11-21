@@ -59,7 +59,7 @@ whollama update           # Force refresh catalog and benchmarks
 
 - **Hardware auto-detection** — Apple Silicon, NVIDIA, AMD, or CPU-only
 - **Live catalog** — scrapes ollama.com/library for the latest models
-- **Live benchmarks** — LiveBench dated tables, merged with a curated snapshot for full coverage
+- **Live benchmarks:** the latest published LiveBench 2.0 release, with a curated fallback for unmatched models
 - **Smart scoring** — composite score factoring benchmark quality, VRAM fit, speed, and recency
 - **Download size estimate** — approximate model weight size from parameter count and quantization
 - **Disk check** — flags whether a model fits available space, is tight, or is too large
@@ -72,7 +72,7 @@ whollama update           # Force refresh catalog and benchmarks
 ## How It Works
 
 1. **Detect** — GPU, VRAM, RAM, disk, and OS are auto-detected
-2. **Fetch** — Model catalog from Ollama + benchmark scores from multiple sources
+2. **Fetch:** model catalog from Ollama + the latest LiveBench 2.0 release when online
 3. **Score** — Each model is ranked by a weighted composite of benchmark quality, VRAM fit, estimated speed, and recency
 4. **Display** — Top recommendations shown in a formatted table, or as JSON
 
@@ -99,6 +99,8 @@ Download size is an estimate from parameter count and quantization, not an exact
 
 `--explain` prints each recommendation's weighted score contributions. When a model's update date is unavailable, its recency contribution uses a neutral value and the explanation says so. JSON output includes `updated_at` (`null` when unavailable), `score_breakdown`, `benchmark_score`, `estimated_download_gb`, and `disk_fit`. `compare` resolves exact catalog names (case and separators are normalized), ranks the requested models, and reports an error for unknown names.
 
+LiveBench 2.0 provides the active online benchmark score. The scorer does not average unlike benchmark sources. It keeps older bundled/cache entries without a verified primary-source score as lower-confidence fallback data. Terminal and JSON output report the benchmark source date and whether a refresh used fallback data.
+
 ## Why whollama?
 
 Running local LLMs via Ollama requires answering two questions that are hard to answer together:
@@ -115,11 +117,13 @@ No network? No problem — whollama ships a bundled catalog and benchmark scores
 | Cache file | TTL | Contents |
 |---|---|---|
 | `~/.whollama/catalog.json` | 24 hours | Scraped Ollama library models |
-| `~/.whollama/benchmarks.json` | 7 days | Merged benchmark scores |
+| `~/.whollama/benchmarks.json` | 7 days | LiveBench scores, legacy fallback scores, and refresh metadata |
 
-`whollama --offline` skips all network requests and uses the cache (or the bundle on first run). Tiny or corrupt caches are ignored automatically and fall back to the next source.
+`whollama --offline` skips all network requests and uses the cache (or the existing bundled scores on first run). Tiny or corrupt caches are ignored automatically and fall back to the bundle. The bundled benchmark file is retained as-is; it is not a newly generated, uniformly dated snapshot.
 
-Recommendation JSON includes a top-level `data_sources` object. Cache entries report whether they are fresh or stale and their age in milliseconds; terminal output shows a compact age.
+Recommendation JSON includes a top-level `data_sources` object. Cache entries report whether they are fresh or stale and their age in milliseconds; terminal output shows a compact age. Benchmark refresh metadata includes the LiveBench release date, URL, model coverage, and a safe failure reason when fallback data is used.
+
+The LiveBench adapter reads public release tables at runtime. Maintainers will not copy new upstream scores into the bundled dataset until they verify redistribution terms and a reproducible snapshot process.
 
 ## Speed calibration
 

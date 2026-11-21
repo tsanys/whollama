@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, it, expect, vi } from 'vitest'
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { BenchmarkScore } from '../src/benchmarks/types.js'
@@ -13,7 +13,15 @@ vi.mock('../src/catalog/scraper.js', () => ({
   scrapeCatalog: vi.fn(async () => []),
 }))
 vi.mock('../src/benchmarks/livebench.js', () => ({
-  fetchLiveBench: vi.fn(async () => new Map()),
+  fetchLiveBench: vi.fn(async () => ({
+    source: 'livebench',
+    state: 'failed',
+    url: 'https://livebench.ai/',
+    row_count: 0,
+    model_count: 0,
+    reason: 'network-error',
+    scores: new Map(),
+  })),
 }))
 
 const catalogFile = join(TMP, 'catalog.json')
@@ -30,6 +38,7 @@ const {
 } = await import('../src/benchmarks/cache.js')
 const { getCatalog } = await import('../src/catalog/index.js')
 const { getBenchmarkScores } = await import('../src/benchmarks/index.js')
+const { fetchLiveBench } = await import('../src/benchmarks/livebench.js')
 
 function catalogModels(): OllamaModel[] {
   return Array.from({ length: 12 }, (_, index) => ({
@@ -63,6 +72,15 @@ function benchmarkScores(): Record<string, BenchmarkScore> {
 
 function expire(file: string, ageMs: number): void {
   const oldDate = new Date(Date.now() - ageMs)
+  try {
+    const cached = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
+    if (typeof cached.timestamp === 'string') {
+      cached.timestamp = oldDate.toISOString()
+      writeFileSync(file, JSON.stringify(cached))
+    }
+  } catch {
+    // The file may be intentionally malformed in tests that don't expire it.
+  }
   utimesSync(file, oldDate, oldDate)
 }
 
@@ -171,6 +189,114 @@ describe('benchmark cache', () => {
     expect(cached?.cache.ageMs).toBeGreaterThanOrEqual(0)
   })
 
+  it('migrates legacy multi-source records without averaging source metrics', async () => {
+    const legacy = benchmarkScores()
+    legacy['model-0'] = {
+      ...legacy['model-0'],
+      score: 60,
+      sources: { livebench: 82, arena_elo: 1180 },
+      source_dates: { livebench: '2026-11-06' },
+    }
+    writeFileSync(
+      benchmarksFile,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        scores: legacy,
+      }),
+    )
+
+    const cached = await readBenchmarkCache()
+    expect(cached?.scores['model-0'].score).toBe(82)
+    expect(cached?.scores['model-0'].normalization_status).toBe('primary-source')
+    expect(cached?.scores['model-1'].normalization_status).toBe('legacy-unverified')
+  })
+
+  it('keeps non-primary legacy metrics marked as unverified', async () => {
+    const legacy = benchmarkScores()
+    legacy['model-0'] = {
+      ...legacy['model-0'],
+      sources: { arena_elo: 1180 },
+    }
+    writeFileSync(
+      benchmarksFile,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        scores: legacy,
+      }),
+    )
+
+    const cached = await readBenchmarkCache()
+    expect(cached?.scores['model-0'].score).toBe(50)
+    expect(cached?.scores['model-0'].normalization_status).toBe('legacy-unverified')
+  })
+
+  it('accepts LiveBench release scores and keeps their upstream date', async () => {
+    const scores = new Map(
+      Array.from({ length: 12 }, (_, index) => [
+        `live model ${index}`,
+        40 + index,
+      ]),
+    )
+    vi.mocked(fetchLiveBench).mockResolvedValueOnce({
+      source: 'livebench',
+      state: 'success',
+      url: 'https://livebench.ai/data/20261106/table.csv',
+      latest_release_date: '2026-11-06',
+      data_date: '2026-11-06',
+      fetched_at: '2026-11-21T00:00:00.000Z',
+      row_count: 12,
+      model_count: 12,
+      aggregation_method: 'livebench-weighted-suite-mean-v1',
+      suite_weights: { Coding: 1.5 },
+      scores,
+    })
+
+    const result = await getBenchmarkScores({ forceRefresh: true })
+    expect(result.source).toBe('live')
+    expect(result.refresh).toMatchObject({
+      state: 'success',
+      data_date: '2026-11-06',
+      model_count: 12,
+      aggregation_method: 'livebench-weighted-suite-mean-v1',
+      suite_weights: { Coding: 1.5 },
+    })
+    expect(result.scores['live model 0']).toMatchObject({
+      score: 40,
+      sources: { livebench: 40 },
+      source_dates: { livebench: '2026-11-06' },
+      last_updated: '2026-11-06T00:00:00.000Z',
+      normalization_status: 'primary-source',
+    })
+    const cached = await readBenchmarkCache()
+    expect(cached?.refresh).not.toHaveProperty('scores')
+    expect(cached?.refresh?.suite_weights).toEqual({ Coding: 1.5 })
+  })
+
+  it('rejects an apparently successful release with inadequate model coverage', async () => {
+    vi.mocked(fetchLiveBench).mockResolvedValueOnce({
+      source: 'livebench',
+      state: 'success',
+      url: 'https://livebench.ai/data/20261106/table.csv',
+      latest_release_date: '2026-11-06',
+      data_date: '2026-11-06',
+      fetched_at: '2026-11-21T00:00:00.000Z',
+      row_count: 2,
+      model_count: 2,
+      scores: new Map([
+        ['live model 0', 40],
+        ['live model 1', 60],
+      ]),
+    })
+
+    const result = await getBenchmarkScores({ forceRefresh: true })
+    expect(result.source).toBe('curated')
+    expect(result.refresh).toMatchObject({
+      state: 'failed',
+      reason: 'inadequate-coverage',
+      model_count: 2,
+    })
+  })
+
   it('rejects malformed and poisoned cached data', async () => {
     writeFileSync(benchmarksFile, '{bad json')
     expect(await readBenchmarkCache()).toBeNull()
@@ -222,5 +348,35 @@ describe('benchmark cache', () => {
     expect(result.source).toBe('cache')
     expect(result.cache?.freshness).toBe('stale')
     expect(Object.keys(result.scores)).toHaveLength(12)
+    expect(result.refresh).toMatchObject({
+      state: 'skipped',
+      reason: 'offline',
+    })
+  })
+
+  it('reports the failed refresh while returning stale cache data', async () => {
+    await writeBenchmarkCache(benchmarkScores())
+    expire(benchmarksFile, 8 * 24 * 60 * 60 * 1_000)
+    vi.mocked(fetchLiveBench).mockResolvedValueOnce({
+      source: 'livebench',
+      state: 'failed',
+      url: 'https://livebench.ai/',
+      row_count: 0,
+      model_count: 0,
+      reason: 'timeout',
+      scores: new Map(),
+    })
+
+    const result = await getBenchmarkScores({ forceRefresh: true })
+    expect(result.source).toBe('cache')
+    expect(result.cache?.freshness).toBe('stale')
+    expect(result.refresh).toMatchObject({
+      state: 'failed',
+      reason: 'timeout',
+    })
+    const persisted = await readStaleBenchmarks()
+    expect(persisted?.cache.freshness).toBe('stale')
+    expect(persisted?.cache.ageMs).toBeGreaterThan(7 * 24 * 60 * 60 * 1_000)
+    expect(persisted?.refresh?.reason).toBe('timeout')
   })
 })

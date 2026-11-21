@@ -85,6 +85,11 @@ export async function infoCommand(options: InfoOptions): Promise<void> {
 
   console.log(renderModelInfo(displayModel, {
     catalog: { source: catalog.source, cache: catalog.cache },
-    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+    benchmarks: {
+      source: benchmarks.source,
+      cache: benchmarks.cache,
+      refresh: benchmarks.refresh,
+      snapshot: benchmarks.snapshot,
+    },
   }))
 }

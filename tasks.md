@@ -122,19 +122,14 @@ Status legend: `[ ]` todo · `[x]` done · `[-]` skipped/deferred
   - Include normalized 0–100 score + source breakdown
 
 - [x] **T-033** LiveBench fetcher (`src/benchmarks/livebench.ts`)
-  - Fetch latest results from LiveBench public data
-  - Normalize scores to 0–100
-  - Return `Map<string, number>`
+  - Legacy task; current adapter reads LiveBench 2.0 dated release tables
+  - Returns release date, coverage, URL, and structured refresh status
 
 - [x] **T-034** Chatbot Arena ELO fetcher (`src/benchmarks/arena.ts`)
-  - Fetch ELO scores from LMSYS public leaderboard data
-  - Normalize ELO range to 0–100
-  - Return `Map<string, number>`
+  - Historical adapter; not active pending availability and terms verification
 
 - [x] **T-035** Open LLM Leaderboard fetcher (`src/benchmarks/openllm.ts`)
-  - Fetch from Hugging Face Open LLM Leaderboard v2 dataset API
-  - Normalize to 0–100
-  - Return `Map<string, number>`
+  - Historical adapter; not active pending dataset and terms verification
 
 - [x] **T-036** Score resolver (`src/benchmarks/resolver.ts`)
   - `resolveScore(modelName, allScores)` → `BenchmarkScore`
@@ -145,8 +140,8 @@ Status legend: `[ ]` todo · `[x]` done · `[-]` skipped/deferred
   - Same pattern as catalog cache — TTL 7 days
 
 - [x] **T-038** Main `getBenchmarkScores()` function (`src/benchmarks/index.ts`)
-  - Fetch all three sources concurrently (`Promise.allSettled`)
-  - Merge scores (average if multiple sources cover same model)
+  - Fetch the verified active source with failure reporting
+  - Keep unlike raw benchmark metrics separate
   - Write to cache on success
   - Fall through to cache → bundled fallback on failure
 
@@ -267,4 +262,4 @@ Status legend: `[ ]` todo · `[x]` done · `[-]` skipped/deferred
 - [x] `whollama bench` — run a quick local benchmark to calibrate speed estimates
 - [ ] Model tag auto-detection from model card (instead of hardcode)
 - [x] fzf-style interactive selector for `whollama pull` (zero-dep inline fuzzy filter, `src/cli/selector.ts`)
-- [x] Homebrew formula (`Formula/whollama.rb` — fill `sha256` from `npm view` on each release)
+- [x] Homebrew formula (`Formula/whollama.rb`; fill `sha256` from `npm view` on each release)

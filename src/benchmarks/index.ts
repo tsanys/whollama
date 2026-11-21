@@ -1,9 +1,19 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
-import { readBenchmarkCache, writeBenchmarkCache, readStaleBenchmarks } from './cache.js'
+import {
+  readBenchmarkCache,
+  readStaleBenchmarks,
+  writeBenchmarkCache,
+  writeBenchmarkRefreshStatus,
+} from './cache.js'
 import { fetchLiveBench } from './livebench.js'
-import type { BenchmarkScore } from './types.js'
+import { normalizeBenchmarkScores, normalizeLiveBenchScores } from './normalize.js'
+import type {
+  BenchmarkRefreshStatus,
+  BenchmarkScore,
+  BenchmarkSnapshotMetadata,
+} from './types.js'
 import type { CacheMetadata } from '../utils/storage.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -18,6 +28,8 @@ export interface BenchmarkResult {
   scores: Record<string, BenchmarkScore>
   source: 'cache' | 'live' | 'curated'
   cache?: CacheMetadata
+  refresh?: BenchmarkRefreshStatus
+  snapshot?: BenchmarkSnapshotMetadata
 }
 
 export const MIN_LIVE_SCORES = 10
@@ -31,62 +43,79 @@ export async function getBenchmarkScores(
   if (!forceRefresh) {
     const cached = await readBenchmarkCache()
     if (cached) {
-      return { scores: cached.scores, source: 'cache', cache: cached.cache }
+      return {
+        scores: cached.scores,
+        source: 'cache',
+        cache: cached.cache,
+        ...(cached.refresh ? { refresh: cached.refresh } : {}),
+        ...(cached.snapshot ? { snapshot: cached.snapshot } : {}),
+      }
     }
   }
 
   // Step 2: Fetch live data (skip if offline)
+  let refresh: BenchmarkRefreshStatus | undefined
   if (!offline) {
-    const liveScores = await fetchLiveScores()
-    if (liveScores && Object.keys(liveScores).length >= MIN_LIVE_SCORES) {
+    const { scores: liveBenchScores, ...livebench } = await fetchLiveBench()
+    refresh = livebench
+    if (
+      livebench.state === 'success' &&
+      livebench.model_count >= MIN_LIVE_SCORES
+    ) {
+      const liveScores = normalizeLiveBenchScores(
+        liveBenchScores,
+        livebench.data_date ?? livebench.latest_release_date ?? '',
+      )
       // Merge curated fallback for models missing from live (keeps offline value prop)
       const curated = await loadCuratedBenchmarks()
       for (const [key, entry] of Object.entries(curated)) {
         if (!(key in liveScores)) {
-          liveScores[key] = {
-            model_id: (entry as BenchmarkScore).model_id ?? key,
-            score: (entry as BenchmarkScore).score ?? 0,
-            tier: 'curated',
-            sources: (entry as BenchmarkScore).sources ?? {},
-            last_updated:
-              (entry as BenchmarkScore).last_updated ?? new Date().toISOString(),
-          }
+          liveScores[key] = { ...entry, tier: 'curated' }
         }
       }
-      await writeBenchmarkCache(liveScores)
-      return { scores: liveScores, source: 'live' }
+      const migratedScores = normalizeBenchmarkScores(liveScores)
+      await writeBenchmarkCache(migratedScores, refresh)
+      return { scores: migratedScores, source: 'live', refresh }
+    }
+    if (livebench.state === 'success') {
+      refresh = {
+        ...livebench,
+        state: 'failed',
+        reason: 'inadequate-coverage',
+      }
+    }
+  } else {
+    refresh = {
+      source: 'livebench',
+      state: 'skipped',
+      url: 'https://livebench.ai/',
+      row_count: 0,
+      model_count: 0,
+      reason: 'offline',
     }
   }
+
+  if (refresh) await writeBenchmarkRefreshStatus(refresh)
 
   // Step 3: Stale cache
   const stale = await readStaleBenchmarks()
   if (stale) {
-    return { scores: stale.scores, source: 'cache', cache: stale.cache }
+    return {
+      scores: stale.scores,
+      source: 'cache',
+      cache: stale.cache,
+      ...(refresh ? { refresh } : stale.refresh ? { refresh: stale.refresh } : {}),
+      ...(stale.snapshot ? { snapshot: stale.snapshot } : {}),
+    }
   }
 
   // Step 4: Curated fallback
-  const curated = await loadCuratedBenchmarks()
-  return { scores: curated, source: 'curated' }
-}
-
-async function fetchLiveScores(): Promise<Record<string, BenchmarkScore> | null> {
-  // Single live source (LiveBench dated CSVs). Chatbot Arena and Open LLM
-  // Leaderboard endpoints died in 2025-2026 (SPA shells, gated datasets)
-  // and were removed; curated data covers the gap (see D1 notes).
-  const livebench = await fetchLiveBench()
-  if (livebench.size === 0) return null
-
-  const merged: Record<string, BenchmarkScore> = {}
-  for (const [normalizedName, score] of livebench) {
-    merged[normalizedName] = {
-      model_id: normalizedName,
-      score,
-      tier: 'direct',
-      sources: { livebench: score },
-      last_updated: new Date().toISOString(),
-    }
+  const curated = normalizeBenchmarkScores(await loadCuratedBenchmarks())
+  return {
+    scores: curated,
+    source: 'curated',
+    ...(refresh ? { refresh } : {}),
   }
-  return merged
 }
 
 async function loadCuratedBenchmarks(): Promise<

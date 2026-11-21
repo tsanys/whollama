@@ -97,14 +97,21 @@ Each catalog entry contains:
 
 ### 6.3 Core — Benchmark Scoring
 
-Scores come from LiveBench's public dated tables, merged with curated scores
-for full coverage (Chatbot Arena and Open LLM Leaderboard endpoints died in
-2025–2026 and were removed; see `src/benchmarks/`):
+LiveBench 2.0 is the active online score source. The scorer uses its
+release-level overall score as-is and does not average it with unlike Arena Elo
+or task-suite measurements. Older curated entries remain a lower-confidence
+fallback. Maintainers will not copy new LiveBench results into the bundled data
+until they verify redistribution terms:
 
 | Source | Type | Weight |
 |---|---|---|
-| LiveBench | Direct benchmark | High |
-| Curated internal scores | Maintainer-assigned fallback | Low |
+| LiveBench 2.0 | Release-weighted benchmark score | Primary |
+| Existing curated/cache entries | Historical fallback; source dates may be unavailable | Low |
+
+Chatbot Arena and Open LLM data are not active sources. Availability, access
+terms, and redistribution terms must be verified before either is enabled.
+The repository preserves `data/benchmarks.json`, but it does not represent a
+uniformly dated or reproducibly generated snapshot.
 
 Score resolution tiers (descending trust):
 1. `direct` — exact model name match on a leaderboard
