@@ -19,11 +19,11 @@ case "$mode" in
     (cd "$root" && npm pack --json --pack-destination "$tmp" > "$tmp/pack.json")
     ;;
   registry)
-    for attempt in 1 2 3 4 5 6; do
-      if (cd "$tmp" && npm pack "@tsany/whollama@$version" --json > "$tmp/pack.json"); then
+    for attempt in {1..20}; do
+      if (cd "$tmp" && npm pack "@tsany/whollama@$version" --prefer-online --json > "$tmp/pack.json"); then
         break
       fi
-      if [ "$attempt" -eq 6 ]; then
+      if [ "$attempt" -eq 20 ]; then
         echo "Package $version was not downloadable after $attempt attempts" >&2
         exit 1
       fi
