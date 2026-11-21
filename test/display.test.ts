@@ -103,12 +103,25 @@ describe('renderJson parity', () => {
   })
 
   it('reports cache freshness and age as additive data-source metadata', () => {
+    const refresh = {
+      source: 'livebench' as const,
+      state: 'failed' as const,
+      url: 'https://livebench.ai/data/20261106/table.csv',
+      latest_release_date: '2026-11-06',
+      row_count: 0,
+      model_count: 0,
+      reason: 'timeout' as const,
+    }
     const dataSources: RecommendationDataSources = {
       catalog: {
         source: 'cache',
         cache: { freshness: 'stale', ageMs: 172_800_000 },
       },
-      benchmarks: { source: 'live' },
+      benchmarks: {
+        source: 'cache',
+        cache: { freshness: 'stale', ageMs: 172_800_000 },
+        refresh,
+      },
     }
 
     const parsed = JSON.parse(renderJson([scored()], hw, dataSources))
@@ -116,8 +129,49 @@ describe('renderJson parity', () => {
       source: 'cache',
       cache: { freshness: 'stale', age_ms: 172_800_000 },
     })
-    expect(parsed.data_sources.benchmarks).toEqual({ source: 'live' })
+    expect(parsed.data_sources.benchmarks).toEqual({
+      source: 'cache',
+      cache: { freshness: 'stale', age_ms: 172_800_000 },
+      last_refresh: {
+        source: 'livebench',
+        state: 'failed',
+        url: 'https://livebench.ai/data/20261106/table.csv',
+        row_count: 0,
+        model_count: 0,
+        latest_release_date: '2026-11-06',
+        reason: 'timeout',
+      },
+    })
     expect(parsed.models[0].name).toBe('qwen3:14b')
+  })
+
+  it('shows benchmark refresh failure beside the cache fallback in terminal output', () => {
+    const lines: string[] = []
+    const log = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      lines.push(args.join(' '))
+    })
+    try {
+      const dataSources: RecommendationDataSources = {
+        catalog: { source: 'cache' },
+        benchmarks: {
+          source: 'cache',
+          cache: { freshness: 'stale', ageMs: 172_800_000 },
+          refresh: {
+            source: 'livebench',
+            state: 'failed',
+            url: 'https://livebench.ai/data/20261106/table.csv',
+            row_count: 0,
+            model_count: 0,
+            reason: 'timeout',
+          },
+        },
+      }
+      renderTable([scored()], hw, undefined, dataSources)
+      expect(lines.join('\n')).toContain('stale cache (2d old)')
+      expect(lines.join('\n')).toContain('LiveBench refresh failed (timeout)')
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('marks comparison output and explains the score factors', () => {

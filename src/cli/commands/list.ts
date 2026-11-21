@@ -55,7 +55,12 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
   const dataSources = {
     catalog: { source: catalog.source, cache: catalog.cache },
-    benchmarks: { source: benchmarks.source, cache: benchmarks.cache },
+    benchmarks: {
+      source: benchmarks.source,
+      cache: benchmarks.cache,
+      refresh: benchmarks.refresh,
+      snapshot: benchmarks.snapshot,
+    },
   } as const
 
   if (options.json) {

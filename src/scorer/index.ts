@@ -30,7 +30,10 @@ export function scoreModels(
   for (const [key, bs] of Object.entries(benchmarks)) {
     const id = bs.model_id || key
     const norm = normalize(id)
-    if (bs.tier === 'curated') {
+    if (
+      bs.tier === 'curated' ||
+      bs.normalization_status === 'legacy-unverified'
+    ) {
       if (!curatedScores.has(norm)) curatedScores.set(norm, bs.score)
     } else {
       allScores.set(norm, bs.score)

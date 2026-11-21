@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { mkdtempSync, readdirSync, rmSync } from 'fs'
-import { safeFetch } from '../src/utils/fetch.js'
+import { safeFetch, safeFetchDetailed } from '../src/utils/fetch.js'
 
 // Isolate ALL storage IO in this file to a temp dir (never ~/.whollama).
 const TMP = mkdtempSync(join(tmpdir(), 'whollama-utils-test-'))
@@ -51,6 +51,41 @@ describe('safeFetch', () => {
     vi.stubGlobal('fetch', fetchMock)
     expect(await safeFetch('https://example.com/x')).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it('returns structured details for terminal HTTP failures', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => okJson({}, 404)))
+
+    await expect(
+      safeFetchDetailed('https://example.com/x', { retries: 0 }),
+    ).resolves.toEqual({
+      response: null,
+      failure: { reason: 'http-error', status: 404 },
+    })
+  })
+  it('classifies network errors and oversized responses', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('offline')
+    }))
+    await expect(
+      safeFetchDetailed('https://example.com/x', { retries: 0 }),
+    ).resolves.toEqual({
+      response: null,
+      failure: { reason: 'network-error' },
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('too large')),
+    )
+    await expect(
+      safeFetchDetailed('https://example.com/x', {
+        maxResponseBytes: 4,
+        retries: 0,
+      }),
+    ).resolves.toEqual({
+      response: null,
+      failure: { reason: 'response-too-large', status: 200 },
+    })
   })
   it('retries 500 then returns success', async () => {
     const fetchMock = vi

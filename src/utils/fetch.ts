@@ -6,6 +6,23 @@ interface FetchOptions {
   maxResponseBytes?: number
 }
 
+export type SafeFetchFailureReason =
+  | 'http-error'
+  | 'network-error'
+  | 'timeout'
+  | 'response-too-large'
+  | 'aborted'
+
+export interface SafeFetchFailure {
+  reason: SafeFetchFailureReason
+  status?: number
+}
+
+export interface SafeFetchResult {
+  response: Response | null
+  failure?: SafeFetchFailure
+}
+
 const DEFAULT_TIMEOUT = 10_000
 const DEFAULT_RETRIES = 2
 const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -97,10 +114,10 @@ async function readBoundedBody(
   return body
 }
 
-export async function safeFetch(
+export async function safeFetchDetailed(
   url: string,
   options: FetchOptions = {},
-): Promise<Response | null> {
+): Promise<SafeFetchResult> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT
   const retries = options.retries ?? DEFAULT_RETRIES
   const maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES
@@ -111,10 +128,13 @@ export async function safeFetch(
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (options.signal?.aborted) return null
+    if (options.signal?.aborted) {
+      return { response: null, failure: { reason: 'aborted' } }
+    }
 
+    let timeoutSignal: AbortSignal | undefined
     try {
-      const timeoutSignal = AbortSignal.timeout(timeout)
+      timeoutSignal = AbortSignal.timeout(timeout)
       const signal = options.signal
         ? AbortSignal.any([options.signal, timeoutSignal])
         : timeoutSignal
@@ -134,33 +154,74 @@ export async function safeFetch(
         if (retryable && attempt < retries) {
           const delay = getRetryDelayMs(response, attempt)
           await response.body?.cancel().catch(() => undefined)
-          if (delay === null) return null
-          if (!(await waitForRetry(delay, options.signal))) return null
+          if (delay === null) {
+            return {
+              response: null,
+              failure: { reason: 'http-error', status: response.status },
+            }
+          }
+          if (!(await waitForRetry(delay, options.signal))) {
+            return { response: null, failure: { reason: 'aborted' } }
+          }
           continue
         }
         await response.body?.cancel().catch(() => undefined)
-        return null
+        return {
+          response: null,
+          failure: { reason: 'http-error', status: response.status },
+        }
       }
 
       const body = await readBoundedBody(response, maxResponseBytes)
-      if (body === null) return null
+      if (body === null) {
+        return {
+          response: null,
+          failure: {
+            reason: 'response-too-large',
+            status: response.status,
+          },
+        }
+      }
       const headers = new Headers(response.headers)
       headers.delete('content-length')
-      return new Response(body.byteLength > 0 ? body.buffer : null, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      })
-    } catch {
-      if (options.signal?.aborted || attempt === retries) return null
+      return {
+        response: new Response(body.byteLength > 0 ? body.buffer : null, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        }),
+      }
+    } catch (error) {
+      if (options.signal?.aborted) {
+        return { response: null, failure: { reason: 'aborted' } }
+      }
+      if (attempt === retries) {
+        const isTimeout =
+          timeoutSignal?.aborted ||
+          (error instanceof Error && error.name === 'TimeoutError')
+        return {
+          response: null,
+          failure: { reason: isTimeout ? 'timeout' : 'network-error' },
+        }
+      }
       const exponentialDelay = Math.min(
         RETRY_BASE_DELAY_MS * 2 ** Math.min(attempt, 5),
         MAX_RETRY_DELAY_MS,
       )
       const delay = Math.round(exponentialDelay * (0.5 + Math.random() * 0.5))
-      if (!(await waitForRetry(delay, options.signal))) return null
+      if (!(await waitForRetry(delay, options.signal))) {
+        return { response: null, failure: { reason: 'aborted' } }
+      }
     }
   }
 
-  return null
+  return { response: null, failure: { reason: 'network-error' } }
+}
+
+export async function safeFetch(
+  url: string,
+  options: FetchOptions = {},
+): Promise<Response | null> {
+  const result = await safeFetchDetailed(url, options)
+  return result.response
 }
